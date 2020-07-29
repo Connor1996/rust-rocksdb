@@ -4,6 +4,6 @@
 	branch = 6.4.tikv
 [submodule "titan"]
 	path = librocksdb_sys/libtitan_sys/titan
-	url = https://github.com/tikv/titan.git
+	url = https://github.com/dongdaoguang/titan.git
 	branch = master
 
