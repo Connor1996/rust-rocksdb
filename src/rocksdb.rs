@@ -763,24 +763,24 @@ impl DB {
         Ok(())
     }
 
-    pub fn multi_batch_write(
-        &self,
-        batches: &[WriteBatch],
-        writeopts: &WriteOptions,
-    ) -> Result<(), String> {
-        unsafe {
-            let b: Vec<*mut DBWriteBatch> = batches.iter().map(|w| w.inner).collect();
-            if !b.is_empty() {
-                ffi_try!(crocksdb_write_multi_batch(
-                    self.inner,
-                    writeopts.inner,
-                    b.as_ptr(),
-                    b.len()
-                ));
-            }
-        }
-        Ok(())
-    }
+    // pub fn multi_batch_write(
+    //     &self,
+    //     batches: &[WriteBatch],
+    //     writeopts: &WriteOptions,
+    // ) -> Result<(), String> {
+    //     unsafe {
+    //         let b: Vec<*mut DBWriteBatch> = batches.iter().map(|w| w.inner).collect();
+    //         if !b.is_empty() {
+    //             ffi_try!(crocksdb_write_multi_batch(
+    //                 self.inner,
+    //                 writeopts.inner,
+    //                 b.as_ptr(),
+    //                 b.len()
+    //             ));
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     pub fn write(&self, batch: &WriteBatch) -> Result<(), String> {
         self.write_opt(batch, &WriteOptions::new())
