@@ -163,7 +163,7 @@ fn build_rocksdb() -> Build {
         .define("WITH_SNAPPY", "ON")
         .define("WITH_TESTS", "OFF")
         .define("WITH_TOOLS", "OFF")
-        .build_target("rocksdb")
+        .build_target("terarkdb")
         .very_verbose(true)
         .build();
     let build_dir = format!("{}/build", dst.display());
@@ -190,8 +190,8 @@ fn build_rocksdb() -> Build {
     let cur_dir = env::current_dir().unwrap();
     build.include(cur_dir.join("rocksdb").join("include"));
     build.include(cur_dir.join("rocksdb"));
-    build.include(cur_dir.join("libtitan_sys").join("titan").join("include"));
-    build.include(cur_dir.join("libtitan_sys").join("titan"));
+    // build.include(cur_dir.join("libtitan_sys").join("titan").join("include"));
+    // build.include(cur_dir.join("libtitan_sys").join("titan"));
 
     // Adding rocksdb specific compile macros.
     // TODO: should make sure crocksdb compile options is the same as rocksdb and titan.
@@ -201,7 +201,7 @@ fn build_rocksdb() -> Build {
     }
 
     println!("cargo:rustc-link-lib=static=rocksdb");
-    println!("cargo:rustc-link-lib=static=titan");
+    // println!("cargo:rustc-link-lib=static=titan");
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");
     println!("cargo:rustc-link-lib=static=lz4");

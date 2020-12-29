@@ -14,7 +14,7 @@
 #include "rocksdb/comparator.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/db.h"
-#include "rocksdb/encryption.h"
+// #include "rocksdb/encryption.h"
 #include "rocksdb/env.h"
 #include "rocksdb/env_encryption.h"
 #include "rocksdb/filter_policy.h"
@@ -26,6 +26,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/perf_context.h"
 #include "rocksdb/rate_limiter.h"
+#include "rocksdb/lazy_buffer.h"
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/sst_file_reader.h"
 #include "rocksdb/statistics.h"
@@ -47,9 +48,9 @@
 #include "util/file_reader_writer.h"
 #include "util/coding.h"
 
-#include "titan/db.h"
-#include "titan/options.h"
-#include "src/blob_format.h"
+// #include "titan/db.h"
+// #include "titan/options.h"
+// #include "src/blob_format.h"
 
 #include <stdlib.h>
 
@@ -168,14 +169,17 @@ using rocksdb::LDBTool;
 
 using rocksdb::kMaxSequenceNumber;
 
-using rocksdb::titandb::BlobIndex;
-using rocksdb::titandb::TitanCFDescriptor;
-using rocksdb::titandb::TitanCFOptions;
-using rocksdb::titandb::TitanDB;
-using rocksdb::titandb::TitanDBOptions;
-using rocksdb::titandb::TitanOptions;
-using rocksdb::titandb::TitanReadOptions;
-using rocksdb::titandb::TitanBlobRunMode;
+// using rocksdb::titandb::BlobIndex;
+// using rocksdb::titandb::TitanBlobRunMode;
+// using rocksdb::titandb::TitanCFDescriptor;
+// using rocksdb::titandb::TitanCFOptions;
+// using rocksdb::titandb::TitanDB;
+// using rocksdb::titandb::TitanDBOptions;
+// using rocksdb::titandb::TitanOptions;
+// using rocksdb::titandb::TitanReadOptions;
+
+// using rocksdb::CloudEnv;
+// using rocksdb::CloudEnvOptions;
 
 using rocksdb::MemoryAllocator;
 
@@ -229,20 +233,44 @@ struct crocksdb_cache_t           { shared_ptr<Cache>   rep; };
 struct crocksdb_memory_allocator_t { shared_ptr<MemoryAllocator> rep; };
 struct crocksdb_livefiles_t       { std::vector<LiveFileMetaData> rep; };
 struct crocksdb_column_family_handle_t  { ColumnFamilyHandle* rep; };
-struct crocksdb_envoptions_t      { EnvOptions        rep; };
-struct crocksdb_sequential_file_t { SequentialFile*   rep; };
-struct crocksdb_ingestexternalfileoptions_t  { IngestExternalFileOptions rep; };
-struct crocksdb_sstfilereader_t   { SstFileReader*    rep; };
-struct crocksdb_sstfilewriter_t   { SstFileWriter*    rep; };
-struct crocksdb_externalsstfileinfo_t   { ExternalSstFileInfo rep; };
-struct crocksdb_ratelimiter_t     { std::shared_ptr<RateLimiter> rep; };
-struct crocksdb_histogramdata_t   { HistogramData     rep; };
-struct crocksdb_pinnableslice_t   { PinnableSlice     rep; };
+};
+struct crocksdb_livefiles_t {
+  std::vector<LiveFileMetaData> rep;
+};
+struct crocksdb_column_family_handle_t {
+  ColumnFamilyHandle* rep;
+};
+struct crocksdb_envoptions_t {
+  EnvOptions rep;
+};
+struct crocksdb_sequential_file_t {
+  SequentialFile* rep;
+};
+struct crocksdb_ingestexternalfileoptions_t {
+  IngestExternalFileOptions rep;
+};
+struct crocksdb_sstfilereader_t {
+  SstFileReader* rep;
+};
+struct crocksdb_sstfilewriter_t {
+  SstFileWriter* rep;
+};
+struct crocksdb_externalsstfileinfo_t {
+  ExternalSstFileInfo rep;
+};
+struct crocksdb_ratelimiter_t {
+  std::shared_ptr<RateLimiter> rep;
+};
+struct crocksdb_histogramdata_t {
+  HistogramData rep;
+};
+struct crocksdb_pinnableslice_t {
+  LazyBuffer rep;
+};
 struct crocksdb_flushjobinfo_t {
   FlushJobInfo rep;
 };
 struct crocksdb_writestallcondition_t {
-  WriteStallCondition rep;
 };
 struct crocksdb_writestallinfo_t {
   WriteStallInfo rep;
@@ -415,135 +443,45 @@ struct crocksdb_filterpolicy_t : public FilterPolicy {
   }
 };
 
-struct crocksdb_mergeoperator_t : public MergeOperator {
-  void* state_;
-  void (*destructor_)(void*);
-  const char* (*name_)(void*);
-  char* (*full_merge_)(
-      void*,
-      const char* key, size_t key_length,
-      const char* existing_value, size_t existing_value_length,
-      const char* const* operands_list, const size_t* operands_list_length,
-      int num_operands,
-      unsigned char* success, size_t* new_value_length);
-  char* (*partial_merge_)(void*, const char* key, size_t key_length,
-                          const char* const* operands_list,
-                          const size_t* operands_list_length, int num_operands,
-                          unsigned char* success, size_t* new_value_length);
-  void (*delete_value_)(
-      void*,
-      const char* value, size_t value_length);
+// struct crocksdb_mergeoperator_t : public MergeOperator {
+//   void* state_;
+//   void (*destructor_)(void*);
+//   const char* (*name_)(void*);
+//   char* (*full_merge_)(void*, const char* key, size_t key_length,
+//                        const char* existing_value, size_t existing_value_length,
+//                        const char* const* operands_list,
+//                        const size_t* operands_list_length, int num_operands,
+//                        unsigned char* success, size_t* new_value_length);
+//   char* (*partial_merge_)(void*, const char* key, size_t key_length,
+//                           const char* const* operands_list,
+//                           const size_t* operands_list_length, int num_operands,
+//                           unsigned char* success, size_t* new_value_length);
+//   void (*delete_value_)(void*, const char* value, size_t value_length);
 
-  virtual ~crocksdb_mergeoperator_t() {
-    (*destructor_)(state_);
-  }
+//   virtual ~crocksdb_mergeoperator_t() { (*destructor_)(state_); }
 
-  virtual const char* Name() const override { return (*name_)(state_); }
+//   virtual const char* Name() const override { return (*name_)(state_); }
 
-  virtual bool FullMergeV2(const MergeOperationInput& merge_in,
-                           MergeOperationOutput* merge_out) const override {
-    size_t n = merge_in.operand_list.size();
-    std::vector<const char*> operand_pointers(n);
-    std::vector<size_t> operand_sizes(n);
-    for (size_t i = 0; i < n; i++) {
-      Slice operand(merge_in.operand_list[i]);
-      operand_pointers[i] = operand.data();
-      operand_sizes[i] = operand.size();
-    }
+//   virtual bool FullMergeV2(const MergeOperationInput& merge_in,
+//                            MergeOperationOutput* merge_out) const override {
+//     size_t n = merge_in.operand_list.size();
+//     std::vector<const char*> operand_pointers(n);
+//     std::vector<size_t> operand_sizes(n);
+//     for (size_t i = 0; i < n; i++) {
+//       Slice operand(merge_in.operand_list[i]);
+//       operand_pointers[i] = operand.data();
+//       operand_sizes[i] = operand.size();
+//     }
 
-    const char* existing_value_data = nullptr;
-    size_t existing_value_len = 0;
-    if (merge_in.existing_value != nullptr) {
-      existing_value_data = merge_in.existing_value->data();
-      existing_value_len = merge_in.existing_value->size();
-    }
+//     const char* existing_value_data = nullptr;
+//     size_t existing_value_len = 0;
+//     if (merge_in.existing_value != nullptr) {
+//       existing_value_data = merge_in.existing_value->data();
+//       existing_value_len = merge_in.existing_value->size();
+//     }
 
-    unsigned char success;
-    size_t new_value_len;
-    char* tmp_new_value = (*full_merge_)(
-        state_, merge_in.key.data(), merge_in.key.size(), existing_value_data,
-        existing_value_len, &operand_pointers[0], &operand_sizes[0],
-        static_cast<int>(n), &success, &new_value_len);
-    merge_out->new_value.assign(tmp_new_value, new_value_len);
-
-    if (delete_value_ != nullptr) {
-      (*delete_value_)(state_, tmp_new_value, new_value_len);
-    } else {
-      free(tmp_new_value);
-    }
-
-    return success;
-  }
-
-  virtual bool PartialMergeMulti(const Slice& key,
-                                 const std::deque<Slice>& operand_list,
-                                 std::string* new_value,
-                                 Logger*) const override {
-    size_t operand_count = operand_list.size();
-    std::vector<const char*> operand_pointers(operand_count);
-    std::vector<size_t> operand_sizes(operand_count);
-    for (size_t i = 0; i < operand_count; ++i) {
-      Slice operand(operand_list[i]);
-      operand_pointers[i] = operand.data();
-      operand_sizes[i] = operand.size();
-    }
-
-    unsigned char success;
-    size_t new_value_len;
-    char* tmp_new_value = (*partial_merge_)(
-        state_, key.data(), key.size(), &operand_pointers[0], &operand_sizes[0],
-        static_cast<int>(operand_count), &success, &new_value_len);
-    new_value->assign(tmp_new_value, new_value_len);
-
-    if (delete_value_ != nullptr) {
-      (*delete_value_)(state_, tmp_new_value, new_value_len);
-    } else {
-      free(tmp_new_value);
-    }
-
-    return success;
-  }
-};
-
-struct crocksdb_env_t {
-  Env* rep;
-  bool is_default;
-  EncryptionProvider* encryption_provider;
-  BlockCipher* block_cipher;
-};
-
-struct crocksdb_slicetransform_t : public SliceTransform {
-  void* state_;
-  void (*destructor_)(void*);
-  const char* (*name_)(void*);
-  char* (*transform_)(
-      void*,
-      const char* key, size_t length,
-      size_t* dst_length);
-  unsigned char (*in_domain_)(
-      void*,
-      const char* key, size_t length);
-  unsigned char (*in_range_)(
-      void*,
-      const char* key, size_t length);
-
-  virtual ~crocksdb_slicetransform_t() {
-    (*destructor_)(state_);
-  }
-
-  virtual const char* Name() const override { return (*name_)(state_); }
-
-  virtual Slice Transform(const Slice& src) const override {
-    size_t len;
-    char* dst = (*transform_)(state_, src.data(), src.size(), &len);
-    return Slice(dst, len);
-  }
-
-  virtual bool InDomain(const Slice& src) const override {
-    return (*in_domain_)(state_, src.data(), src.size());
-  }
-
-  virtual bool InRange(const Slice& src) const override {
+//     unsigned char success;
+//     size_t new_value_len;
     return (*in_range_)(state_, src.data(), src.size());
   }
 };
@@ -552,15 +490,15 @@ struct crocksdb_universal_compaction_options_t {
   rocksdb::CompactionOptionsUniversal *rep;
 };
 
-#ifdef OPENSSL
-struct crocksdb_file_encryption_info_t {
-  FileEncryptionInfo* rep;
-};
+// #ifdef OPENSSL
+// struct crocksdb_file_encryption_info_t {
+//   FileEncryptionInfo* rep;
+// };
 
-struct crocksdb_encryption_key_manager_t {
-  std::shared_ptr<KeyManager> rep;
-};
-#endif
+// struct crocksdb_encryption_key_manager_t {
+//   std::shared_ptr<KeyManager> rep;
+// };
+// #endif
 
 static bool SaveError(char** errptr, const Status& s) {
   assert(errptr != nullptr);

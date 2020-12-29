@@ -43,7 +43,7 @@ use std::{fs, ptr, slice};
 use encryption::{DBEncryptionKeyManager, EncryptionKeyManager};
 use table_properties::{TableProperties, TablePropertiesCollection};
 use table_properties_rc::TablePropertiesCollection as RcTablePropertiesCollection;
-use titan::TitanDBOptions;
+// use titan::TitanDBOptions;
 
 pub struct CFHandle {
     inner: *mut DBCFHandle,
@@ -71,9 +71,9 @@ fn ensure_default_cf_exists<'a>(
     let contains = list.iter().any(|ref cf| cf.is_default());
     if !contains {
         let mut desc = ColumnFamilyDescriptor::default();
-        if is_titan {
-            desc.options.set_titandb_options(&TitanDBOptions::new());
-        }
+        // if is_titan {
+        //     desc.options.set_titandb_options(&TitanDBOptions::new());
+        // }
         list.push(desc);
         if ttls.len() > 0 {
             ttls.push(0);
@@ -89,9 +89,9 @@ fn split_descriptors<'a>(
     let mut v2 = Vec::with_capacity(list.len());
     for mut d in list {
         v1.push(d.name);
-        if is_titan && d.options.titan_inner.is_null() {
-            d.options.set_titandb_options(&TitanDBOptions::new());
-        }
+        // if is_titan && d.options.titan_inner.is_null() {
+        //     d.options.set_titandb_options(&TitanDBOptions::new());
+        // }
         v2.push(d.options);
     }
     (v1, v2)
@@ -163,7 +163,8 @@ unsafe impl Sync for DB {}
 
 impl DB {
     pub fn is_titan(&self) -> bool {
-        !self.opts.titan_inner.is_null()
+        false
+        // !self.opts.titan_inner.is_null()
     }
 }
 
@@ -199,15 +200,7 @@ impl<'a> From<&'a [u8]> for SeekKey<'a> {
 impl<D: Deref<Target = DB>> DBIterator<D> {
     pub fn new(db: D, readopts: ReadOptions) -> DBIterator<D> {
         unsafe {
-            let iterator = if db.is_titan() {
-                crocksdb_ffi::ctitandb_create_iterator(
-                    db.inner,
-                    readopts.get_inner(),
-                    readopts.get_titan_inner(),
-                )
-            } else {
-                crocksdb_ffi::crocksdb_create_iterator(db.inner, readopts.get_inner())
-            };
+            let iterator = crocksdb_ffi::crocksdb_create_iterator(db.inner, readopts.get_inner());
 
             DBIterator {
                 _db: db,
@@ -219,20 +212,11 @@ impl<D: Deref<Target = DB>> DBIterator<D> {
 
     pub fn new_cf(db: D, cf_handle: &CFHandle, readopts: ReadOptions) -> DBIterator<D> {
         unsafe {
-            let iterator = if db.is_titan() {
-                crocksdb_ffi::ctitandb_create_iterator_cf(
-                    db.inner,
-                    readopts.get_inner(),
-                    readopts.get_titan_inner(),
-                    cf_handle.inner,
-                )
-            } else {
-                crocksdb_ffi::crocksdb_create_iterator_cf(
-                    db.inner,
-                    readopts.get_inner(),
-                    cf_handle.inner,
-                )
-            };
+            let iterator = crocksdb_ffi::crocksdb_create_iterator_cf(
+                db.inner,
+                readopts.get_inner(),
+                cf_handle.inner,
+            );
             DBIterator {
                 _db: db,
                 _readopts: readopts,
@@ -572,9 +556,9 @@ impl DB {
 
         let mut descs = cfds.into_iter().map(|t| t.into()).collect();
         let mut ttls_vec = ttls.to_vec();
-        ensure_default_cf_exists(&mut descs, &mut ttls_vec, !opts.titan_inner.is_null());
+        ensure_default_cf_exists(&mut descs, &mut ttls_vec, false);
 
-        let (names, options) = split_descriptors(descs, !opts.titan_inner.is_null());
+        let (names, options) = split_descriptors(descs, false);
         let cstrings = build_cstring_list(&names);
 
         let cf_names: Vec<*const _> = cstrings.iter().map(|cs| cs.as_ptr()).collect();
@@ -583,17 +567,17 @@ impl DB {
             .iter()
             .map(|x| x.inner as *const crocksdb_ffi::Options)
             .collect();
-        let titan_cf_options: Vec<_> = options
-            .iter()
-            .map(|x| {
-                if !x.titan_inner.is_null() {
-                    unsafe {
-                        crocksdb_ffi::ctitandb_options_set_rocksdb_options(x.titan_inner, x.inner);
-                    }
-                }
-                x.titan_inner as *const crocksdb_ffi::DBTitanDBOptions
-            })
-            .collect();
+        // let titan_cf_options: Vec<_> = options
+        //     .iter()
+        //     .map(|x| {
+        //         if !x.titan_inner.is_null() {
+        //             unsafe {
+        //                 crocksdb_ffi::ctitandb_options_set_rocksdb_options(x.titan_inner, x.inner);
+        //             }
+        //         }
+        //         x.titan_inner as *const crocksdb_ffi::DBTitanDBOptions
+        //     })
+        //     .collect();
 
         let readonly = error_if_log_file_exist.is_some();
 
@@ -613,20 +597,20 @@ impl DB {
             let db_cfs_count = cf_names.len() as c_int;
             let db_cf_ptrs = cf_names.as_ptr();
             let db_cf_opts = cf_options.as_ptr();
-            let titan_cf_opts = titan_cf_options.as_ptr();
+            // let titan_cf_opts = titan_cf_options.as_ptr();
             let db_cf_handles = cf_handles.as_ptr();
 
-            let titan_options = opts.titan_inner;
-            if !titan_options.is_null() {
-                unsafe {
-                    crocksdb_ffi::ctitandb_options_set_rocksdb_options(titan_options, db_options);
-                }
-                if error_if_log_file_exist.is_some() {
-                    return Err("TitanDB doesn't support read only mode.".to_owned());
-                } else if with_ttl {
-                    return Err("TitanDB doesn't support ttl.".to_owned());
-                }
-            }
+            // let titan_options = opts.titan_inner;
+            // if !titan_options.is_null() {
+            //     unsafe {
+            //         crocksdb_ffi::ctitandb_options_set_rocksdb_options(titan_options, db_options);
+            //     }
+            //     if error_if_log_file_exist.is_some() {
+            //         return Err("TitanDB doesn't support read only mode.".to_owned());
+            //     } else if with_ttl {
+            //         return Err("TitanDB doesn't support ttl.".to_owned());
+            //     }
+            // }
 
             if !with_ttl {
                 if let Some(flag) = error_if_log_file_exist {
@@ -641,7 +625,7 @@ impl DB {
                             flag
                         ))
                     }
-                } else if titan_options.is_null() {
+                } else {
                     unsafe {
                         ffi_try!(crocksdb_open_column_families(
                             db_options,
@@ -649,17 +633,6 @@ impl DB {
                             db_cfs_count,
                             db_cf_ptrs,
                             db_cf_opts,
-                            db_cf_handles
-                        ))
-                    }
-                } else {
-                    unsafe {
-                        ffi_try!(ctitandb_open_column_families(
-                            db_path,
-                            titan_options,
-                            db_cfs_count,
-                            db_cf_ptrs,
-                            titan_cf_opts,
                             db_cf_handles
                         ))
                     }
@@ -693,10 +666,10 @@ impl DB {
             // the options provided when opening db may sanitized, so get the latest options.
             crocksdb_ffi::crocksdb_options_destroy(opts.inner);
             opts.inner = crocksdb_ffi::crocksdb_get_db_options(db);
-            if !opts.titan_inner.is_null() {
-                crocksdb_ffi::ctitandb_options_destroy(opts.titan_inner);
-                opts.titan_inner = crocksdb_ffi::ctitandb_get_titan_db_options(db);
-            }
+            // if !opts.titan_inner.is_null() {
+            //     crocksdb_ffi::ctitandb_options_destroy(opts.titan_inner);
+            //     opts.titan_inner = crocksdb_ffi::ctitandb_get_titan_db_options(db);
+            // }
         }
 
         let cfs = names
@@ -878,26 +851,11 @@ impl DB {
         };
         let cname_ptr = cname.as_ptr();
         unsafe {
-            let cf_handler = if !self.is_titan() {
-                ffi_try!(crocksdb_create_column_family(
-                    self.inner,
-                    cfd.options.inner,
-                    cname_ptr
-                ))
-            } else {
-                if cfd.options.titan_inner.is_null() {
-                    cfd.options.set_titandb_options(&TitanDBOptions::new());
-                }
-                crocksdb_ffi::ctitandb_options_set_rocksdb_options(
-                    cfd.options.titan_inner,
-                    cfd.options.inner,
-                );
-                ffi_try!(ctitandb_create_column_family(
-                    self.inner,
-                    cfd.options.titan_inner,
-                    cname_ptr
-                ))
-            };
+            let cf_handler = ffi_try!(crocksdb_create_column_family(
+                self.inner,
+                cfd.options.inner,
+                cname_ptr
+            ));
             let handle = CFHandle { inner: cf_handler };
             self._cf_opts.push(cfd.options);
             Ok(match self.cfs.entry(cfd.name.to_owned()) {
@@ -1310,14 +1268,14 @@ impl DB {
     ) -> Result<(), String> {
         unsafe {
             if self.is_titan() {
-                ffi_try!(ctitandb_delete_files_in_range(
-                    self.inner,
-                    start_key.as_ptr(),
-                    start_key.len() as size_t,
-                    end_key.as_ptr(),
-                    end_key.len() as size_t,
-                    include_end
-                ));
+                // ffi_try!(ctitandb_delete_files_in_range(
+                //     self.inner,
+                //     start_key.as_ptr(),
+                //     start_key.len() as size_t,
+                //     end_key.as_ptr(),
+                //     end_key.len() as size_t,
+                //     include_end
+                // ));
             } else {
                 ffi_try!(crocksdb_delete_files_in_range(
                     self.inner,
@@ -1341,15 +1299,15 @@ impl DB {
     ) -> Result<(), String> {
         unsafe {
             if self.is_titan() {
-                ffi_try!(ctitandb_delete_files_in_range_cf(
-                    self.inner,
-                    cf.inner,
-                    start_key.as_ptr(),
-                    start_key.len() as size_t,
-                    end_key.as_ptr(),
-                    end_key.len() as size_t,
-                    include_end
-                ));
+                // ffi_try!(ctitandb_delete_files_in_range_cf(
+                //     self.inner,
+                //     cf.inner,
+                //     start_key.as_ptr(),
+                //     start_key.len() as size_t,
+                //     end_key.as_ptr(),
+                //     end_key.len() as size_t,
+                //     include_end
+                // ));
             } else {
                 ffi_try!(crocksdb_delete_files_in_range_cf(
                     self.inner,
@@ -1377,16 +1335,16 @@ impl DB {
         let limit_keys_lens: Vec<_> = ranges.iter().map(|x| x.end_key.len()).collect();
         unsafe {
             if self.is_titan() {
-                ffi_try!(ctitandb_delete_files_in_ranges_cf(
-                    self.inner,
-                    cf.inner,
-                    start_keys.as_ptr(),
-                    start_keys_lens.as_ptr(),
-                    limit_keys.as_ptr(),
-                    limit_keys_lens.as_ptr(),
-                    ranges.len(),
-                    include_end
-                ));
+                // ffi_try!(ctitandb_delete_files_in_ranges_cf(
+                //     self.inner,
+                //     cf.inner,
+                //     start_keys.as_ptr(),
+                //     start_keys_lens.as_ptr(),
+                //     limit_keys.as_ptr(),
+                //     limit_keys_lens.as_ptr(),
+                //     ranges.len(),
+                //     include_end
+                // ));
             } else {
                 ffi_try!(crocksdb_delete_files_in_ranges_cf(
                     self.inner,
@@ -1411,14 +1369,14 @@ impl DB {
     ) -> Result<(), String> {
         unsafe {
             if self.is_titan() {
-                ffi_try!(ctitandb_delete_blob_files_in_range(
-                    self.inner,
-                    start_key.as_ptr(),
-                    start_key.len() as size_t,
-                    end_key.as_ptr(),
-                    end_key.len() as size_t,
-                    include_end
-                ));
+                // ffi_try!(ctitandb_delete_blob_files_in_range(
+                //     self.inner,
+                //     start_key.as_ptr(),
+                //     start_key.len() as size_t,
+                //     end_key.as_ptr(),
+                //     end_key.len() as size_t,
+                //     include_end
+                // ));
             }
             Ok(())
         }
@@ -1433,15 +1391,15 @@ impl DB {
     ) -> Result<(), String> {
         unsafe {
             if self.is_titan() {
-                ffi_try!(ctitandb_delete_blob_files_in_range_cf(
-                    self.inner,
-                    cf.inner,
-                    start_key.as_ptr(),
-                    start_key.len() as size_t,
-                    end_key.as_ptr(),
-                    end_key.len() as size_t,
-                    include_end
-                ));
+                // ffi_try!(ctitandb_delete_blob_files_in_range_cf(
+                //     self.inner,
+                //     cf.inner,
+                //     start_key.as_ptr(),
+                //     start_key.len() as size_t,
+                //     end_key.as_ptr(),
+                //     end_key.len() as size_t,
+                //     include_end
+                // ));
             }
             Ok(())
         }
@@ -1455,22 +1413,22 @@ impl DB {
     ) -> Result<(), String> {
         unsafe {
             if self.is_titan() {
-                let start_keys: Vec<*const u8> =
-                    ranges.iter().map(|x| x.start_key.as_ptr()).collect();
-                let start_keys_lens: Vec<_> = ranges.iter().map(|x| x.start_key.len()).collect();
-                let limit_keys: Vec<*const u8> =
-                    ranges.iter().map(|x| x.end_key.as_ptr()).collect();
-                let limit_keys_lens: Vec<_> = ranges.iter().map(|x| x.end_key.len()).collect();
-                ffi_try!(ctitandb_delete_blob_files_in_ranges_cf(
-                    self.inner,
-                    cf.inner,
-                    start_keys.as_ptr(),
-                    start_keys_lens.as_ptr(),
-                    limit_keys.as_ptr(),
-                    limit_keys_lens.as_ptr(),
-                    ranges.len(),
-                    include_end
-                ));
+                // let start_keys: Vec<*const u8> =
+                //     ranges.iter().map(|x| x.start_key.as_ptr()).collect();
+                // let start_keys_lens: Vec<_> = ranges.iter().map(|x| x.start_key.len()).collect();
+                // let limit_keys: Vec<*const u8> =
+                //     ranges.iter().map(|x| x.end_key.as_ptr()).collect();
+                // let limit_keys_lens: Vec<_> = ranges.iter().map(|x| x.end_key.len()).collect();
+                // ffi_try!(ctitandb_delete_blob_files_in_ranges_cf(
+                //     self.inner,
+                //     cf.inner,
+                //     start_keys.as_ptr(),
+                //     start_keys_lens.as_ptr(),
+                //     limit_keys.as_ptr(),
+                //     limit_keys_lens.as_ptr(),
+                //     ranges.len(),
+                //     include_end
+                // ));
             }
         }
         Ok(())
@@ -1612,24 +1570,24 @@ impl DB {
         let cf = self.cf_handle("default").unwrap();
         unsafe {
             let inner = crocksdb_ffi::crocksdb_get_options_cf(self.inner, cf.inner);
-            let titan_inner = if self.is_titan() {
-                crocksdb_ffi::ctitandb_get_titan_options_cf(self.inner, cf.inner)
-            } else {
-                ptr::null_mut::<DBTitanDBOptions>()
-            };
-            ColumnFamilyOptions::from_raw(inner, titan_inner)
+            // let titan_inner = if self.is_titan() {
+            //     crocksdb_ffi::ctitandb_get_titan_options_cf(self.inner, cf.inner)
+            // } else {
+            //     ptr::null_mut::<DBTitanDBOptions>()
+            // };
+            ColumnFamilyOptions::from_raw(inner)
         }
     }
 
     pub fn get_options_cf(&self, cf: &CFHandle) -> ColumnFamilyOptions {
         unsafe {
             let inner = crocksdb_ffi::crocksdb_get_options_cf(self.inner, cf.inner);
-            let titan_inner = if self.is_titan() {
-                crocksdb_ffi::ctitandb_get_titan_options_cf(self.inner, cf.inner)
-            } else {
-                ptr::null_mut::<DBTitanDBOptions>()
-            };
-            ColumnFamilyOptions::from_raw(inner, titan_inner)
+            // let titan_inner = if self.is_titan() {
+            //     crocksdb_ffi::ctitandb_get_titan_options_cf(self.inner, cf.inner)
+            // } else {
+            //     ptr::null_mut::<DBTitanDBOptions>()
+            // };
+            ColumnFamilyOptions::from_raw(inner)
         }
     }
 
@@ -1775,13 +1733,13 @@ impl DB {
         self.get_options_cf(cf).get_block_cache_usage()
     }
 
-    pub fn get_blob_cache_usage(&self) -> u64 {
-        self.get_options().get_blob_cache_usage()
-    }
+    // pub fn get_blob_cache_usage(&self) -> u64 {
+    //     self.get_options().get_blob_cache_usage()
+    // }
 
-    pub fn get_blob_cache_usage_cf(&self, cf: &CFHandle) -> u64 {
-        self.get_options_cf(cf).get_blob_cache_usage()
-    }
+    // pub fn get_blob_cache_usage_cf(&self, cf: &CFHandle) -> u64 {
+    //     self.get_options_cf(cf).get_blob_cache_usage()
+    // }
 
     pub fn get_properties_of_all_tables(&self) -> Result<TablePropertiesCollection, String> {
         unsafe {

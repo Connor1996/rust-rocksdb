@@ -62,7 +62,7 @@ pub use table_properties::{
 };
 pub use table_properties_collector::TablePropertiesCollector;
 pub use table_properties_collector_factory::TablePropertiesCollectorFactory;
-pub use titan::{TitanBlobIndex, TitanDBOptions};
+// pub use titan::{TitanBlobIndex, TitanDBOptions};
 
 #[allow(deprecated)]
 pub use rocksdb::Kv;
