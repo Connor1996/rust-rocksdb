@@ -1340,8 +1340,8 @@ extern C_ROCKSDB_LIBRARY_API void crocksdb_readoptions_set_total_order_seek(
     crocksdb_readoptions_t*, unsigned char);
 extern C_ROCKSDB_LIBRARY_API void crocksdb_readoptions_set_prefix_same_as_start(
     crocksdb_readoptions_t*, unsigned char);
-extern C_ROCKSDB_LIBRARY_API void
-crocksdb_readoptions_set_pin_data(crocksdb_readoptions_t *, unsigned char);
+// extern C_ROCKSDB_LIBRARY_API void
+// crocksdb_readoptions_set_pin_data(crocksdb_readoptions_t *, unsigned char);
 extern C_ROCKSDB_LIBRARY_API void
 crocksdb_readoptions_set_background_purge_on_iterator_cleanup(
     crocksdb_readoptions_t *, unsigned char);

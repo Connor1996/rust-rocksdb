@@ -415,11 +415,11 @@ impl ReadOptions {
         }
     }
 
-    pub fn set_pin_data(&mut self, v: bool) {
-        unsafe {
-            crocksdb_ffi::crocksdb_readoptions_set_pin_data(self.inner, v);
-        }
-    }
+    // pub fn set_pin_data(&mut self, v: bool) {
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_readoptions_set_pin_data(self.inner, v);
+    //     }
+    // }
 
     pub fn set_background_purge_on_iterator_cleanup(&mut self, v: bool) {
         unsafe {
@@ -1081,21 +1081,21 @@ impl DBOptions {
         }
     }
 
-    pub fn enable_multi_batch_write(&self, v: bool) {
-        unsafe {
-            crocksdb_ffi::crocksdb_options_set_enable_multi_batch_write(self.inner, v);
-        }
-    }
+    // pub fn enable_multi_batch_write(&self, v: bool) {
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_options_set_enable_multi_batch_write(self.inner, v);
+    //     }
+    // }
 
     pub fn is_enable_multi_batch_write(&self) -> bool {
         unsafe { crocksdb_ffi::crocksdb_options_is_enable_multi_batch_write(self.inner) }
     }
 
-    pub fn enable_unordered_write(&self, v: bool) {
-        unsafe {
-            crocksdb_ffi::crocksdb_options_set_unordered_write(self.inner, v);
-        }
-    }
+    // pub fn enable_unordered_write(&self, v: bool) {
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_options_set_unordered_write(self.inner, v);
+    //     }
+    // }
 
     pub fn allow_concurrent_memtable_write(&self, v: bool) {
         unsafe {
@@ -1727,11 +1727,11 @@ impl ColumnFamilyOptions {
         }
     }
 
-    pub fn set_doubly_skiplist(&self) {
-        unsafe {
-            crocksdb_ffi::crocksdb_options_set_doubly_skip_list_rep(self.inner);
-        }
-    }
+    // pub fn set_doubly_skiplist(&self) {
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_options_set_doubly_skip_list_rep(self.inner);
+    //     }
+    // }
 
     pub fn get_memtable_factory_name(&self) -> Option<&str> {
         unsafe {

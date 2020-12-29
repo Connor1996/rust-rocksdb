@@ -714,7 +714,7 @@ fn test_read_options() {
     read_opts.set_verify_checksums(true);
     read_opts.fill_cache(true);
     read_opts.set_tailing(true);
-    read_opts.set_pin_data(true);
+    // read_opts.set_pin_data(true);
     read_opts.set_background_purge_on_iterator_cleanup(true);
     read_opts.set_ignore_range_deletions(true);
     read_opts.set_max_skippable_internal_keys(0);

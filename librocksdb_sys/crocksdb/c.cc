@@ -43,7 +43,7 @@
 
 #include "db/column_family.h"
 #include "table/sst_file_writer_collectors.h"
-#include "table/block_based/block_based_table_factory.h"
+#include "table/block_based_table_factory.h"
 #include "table/table_reader.h"
 #include "util/file_reader_writer.h"
 #include "util/coding.h"
@@ -129,7 +129,8 @@ using rocksdb::CompactRangeOptions;
 using rocksdb::RateLimiter;
 using rocksdb::NewGenericRateLimiter;
 using rocksdb::HistogramData;
-using rocksdb::PinnableSlice;
+using rocksdb::LazyBuffer;
+// using rocksdb::PinnableSlice;
 using rocksdb::FilterBitsBuilder;
 using rocksdb::FilterBitsReader;
 using rocksdb::EntryType;
@@ -233,44 +234,20 @@ struct crocksdb_cache_t           { shared_ptr<Cache>   rep; };
 struct crocksdb_memory_allocator_t { shared_ptr<MemoryAllocator> rep; };
 struct crocksdb_livefiles_t       { std::vector<LiveFileMetaData> rep; };
 struct crocksdb_column_family_handle_t  { ColumnFamilyHandle* rep; };
-};
-struct crocksdb_livefiles_t {
-  std::vector<LiveFileMetaData> rep;
-};
-struct crocksdb_column_family_handle_t {
-  ColumnFamilyHandle* rep;
-};
-struct crocksdb_envoptions_t {
-  EnvOptions rep;
-};
-struct crocksdb_sequential_file_t {
-  SequentialFile* rep;
-};
-struct crocksdb_ingestexternalfileoptions_t {
-  IngestExternalFileOptions rep;
-};
-struct crocksdb_sstfilereader_t {
-  SstFileReader* rep;
-};
-struct crocksdb_sstfilewriter_t {
-  SstFileWriter* rep;
-};
-struct crocksdb_externalsstfileinfo_t {
-  ExternalSstFileInfo rep;
-};
-struct crocksdb_ratelimiter_t {
-  std::shared_ptr<RateLimiter> rep;
-};
-struct crocksdb_histogramdata_t {
-  HistogramData rep;
-};
-struct crocksdb_pinnableslice_t {
-  LazyBuffer rep;
-};
+struct crocksdb_envoptions_t      { EnvOptions        rep; };
+struct crocksdb_sequential_file_t { SequentialFile*   rep; };
+struct crocksdb_ingestexternalfileoptions_t  { IngestExternalFileOptions rep; };
+struct crocksdb_sstfilereader_t   { SstFileReader*    rep; };
+struct crocksdb_sstfilewriter_t   { SstFileWriter*    rep; };
+struct crocksdb_externalsstfileinfo_t   { ExternalSstFileInfo rep; };
+struct crocksdb_ratelimiter_t     { std::shared_ptr<RateLimiter> rep; };
+struct crocksdb_histogramdata_t   { HistogramData     rep; };
+struct crocksdb_pinnableslice_t   { LazyBuffer     rep; };
 struct crocksdb_flushjobinfo_t {
   FlushJobInfo rep;
 };
 struct crocksdb_writestallcondition_t {
+  WriteStallCondition rep;
 };
 struct crocksdb_writestallinfo_t {
   WriteStallInfo rep;
@@ -443,45 +420,140 @@ struct crocksdb_filterpolicy_t : public FilterPolicy {
   }
 };
 
-// struct crocksdb_mergeoperator_t : public MergeOperator {
-//   void* state_;
-//   void (*destructor_)(void*);
-//   const char* (*name_)(void*);
-//   char* (*full_merge_)(void*, const char* key, size_t key_length,
-//                        const char* existing_value, size_t existing_value_length,
-//                        const char* const* operands_list,
-//                        const size_t* operands_list_length, int num_operands,
-//                        unsigned char* success, size_t* new_value_length);
-//   char* (*partial_merge_)(void*, const char* key, size_t key_length,
-//                           const char* const* operands_list,
-//                           const size_t* operands_list_length, int num_operands,
-//                           unsigned char* success, size_t* new_value_length);
-//   void (*delete_value_)(void*, const char* value, size_t value_length);
+struct crocksdb_mergeoperator_t : public MergeOperator {
+  void* state_;
+  void (*destructor_)(void*);
+  const char* (*name_)(void*);
+  char* (*full_merge_)(void*, const char* key, size_t key_length,
+                       const char* existing_value, size_t existing_value_length,
+                       const char* const* operands_list,
+                       const size_t* operands_list_length, int num_operands,
+                       unsigned char* success, size_t* new_value_length);
+  char* (*partial_merge_)(void*, const char* key, size_t key_length,
+                          const char* const* operands_list,
+                          const size_t* operands_list_length, int num_operands,
+                          unsigned char* success, size_t* new_value_length);
+  void (*delete_value_)(void*, const char* value, size_t value_length);
 
-//   virtual ~crocksdb_mergeoperator_t() { (*destructor_)(state_); }
+  virtual ~crocksdb_mergeoperator_t() { (*destructor_)(state_); }
 
-//   virtual const char* Name() const override { return (*name_)(state_); }
+  virtual const char* Name() const override { return (*name_)(state_); }
 
-//   virtual bool FullMergeV2(const MergeOperationInput& merge_in,
-//                            MergeOperationOutput* merge_out) const override {
-//     size_t n = merge_in.operand_list.size();
-//     std::vector<const char*> operand_pointers(n);
-//     std::vector<size_t> operand_sizes(n);
-//     for (size_t i = 0; i < n; i++) {
-//       Slice operand(merge_in.operand_list[i]);
-//       operand_pointers[i] = operand.data();
-//       operand_sizes[i] = operand.size();
-//     }
+  virtual bool FullMergeV2(const MergeOperationInput& merge_in,
+                           MergeOperationOutput* merge_out) const override {
+    size_t n = merge_in.operand_list.size();
+    std::vector<const char*> operand_pointers(n);
+    std::vector<size_t> operand_sizes(n);
+    for (size_t i = 0; i < n; i++) {
+      const LazyBuffer& operand = merge_in.operand_list[i];
+      if (!Fetch(operand, &merge_out->new_value)) {
+        return true;
+      }
+      operand_pointers[i] = operand.data();
+      operand_sizes[i] = operand.size();
+    }
 
-//     const char* existing_value_data = nullptr;
-//     size_t existing_value_len = 0;
-//     if (merge_in.existing_value != nullptr) {
-//       existing_value_data = merge_in.existing_value->data();
-//       existing_value_len = merge_in.existing_value->size();
-//     }
+    const char* existing_value_data = nullptr;
+    size_t existing_value_len = 0;
+    if (merge_in.existing_value != nullptr) {
+      if (!Fetch(*merge_in.existing_value, &merge_out->new_value)) {
+        return true;
+      }
+      existing_value_data = merge_in.existing_value->data();
+      existing_value_len = merge_in.existing_value->size();
+    }
 
-//     unsigned char success;
-//     size_t new_value_len;
+    unsigned char success;
+    size_t new_value_len;
+    char* tmp_new_value = (*full_merge_)(
+        state_, merge_in.key.data(), merge_in.key.size(), existing_value_data,
+        existing_value_len, &operand_pointers[0], &operand_sizes[0],
+        static_cast<int>(n), &success, &new_value_len);
+    merge_out->new_value.reset(Slice(tmp_new_value, new_value_len), true);
+
+    if (delete_value_ != nullptr) {
+      (*delete_value_)(state_, tmp_new_value, new_value_len);
+    } else {
+      free(tmp_new_value);
+    }
+
+    return success;
+  }
+
+  virtual bool PartialMergeMulti(const Slice& key,
+                                 const std::vector<LazyBuffer>& operand_list,
+                                 LazyBuffer* new_value,
+                                 Logger* /*logger*/) const override {
+    size_t operand_count = operand_list.size();
+    std::vector<const char*> operand_pointers(operand_count);
+    std::vector<size_t> operand_sizes(operand_count);
+    for (size_t i = 0; i < operand_count; ++i) {
+      const LazyBuffer& operand = operand_list[i];
+      if (!operand.fetch().ok()) {
+        return false;
+      }
+      operand_pointers[i] = operand.data();
+      operand_sizes[i] = operand.size();
+    }
+
+    unsigned char success;
+    size_t new_value_len;
+    char* tmp_new_value = (*partial_merge_)(
+        state_, key.data(), key.size(), &operand_pointers[0], &operand_sizes[0],
+        static_cast<int>(operand_count), &success, &new_value_len);
+    new_value->reset(Slice(tmp_new_value, new_value_len), true);
+
+    if (delete_value_ != nullptr) {
+      (*delete_value_)(state_, tmp_new_value, new_value_len);
+    } else {
+      free(tmp_new_value);
+    }
+
+    return success;
+  }
+};
+
+
+
+struct crocksdb_env_t {
+  Env* rep;
+  bool is_default;
+  EncryptionProvider* encryption_provider;
+  BlockCipher* block_cipher;
+};
+
+struct crocksdb_slicetransform_t : public SliceTransform {
+  void* state_;
+  void (*destructor_)(void*);
+  const char* (*name_)(void*);
+  char* (*transform_)(
+      void*,
+      const char* key, size_t length,
+      size_t* dst_length);
+  unsigned char (*in_domain_)(
+      void*,
+      const char* key, size_t length);
+  unsigned char (*in_range_)(
+      void*,
+      const char* key, size_t length);
+
+  virtual ~crocksdb_slicetransform_t() {
+    (*destructor_)(state_);
+  }
+
+  virtual const char* Name() const override { return (*name_)(state_); }
+
+  virtual Slice Transform(const Slice& src) const override {
+    size_t len;
+    char* dst = (*transform_)(state_, src.data(), src.size(), &len);
+    return Slice(dst, len);
+  }
+
+  virtual bool InDomain(const Slice& src) const override {
+    return (*in_domain_)(state_, src.data(), src.size());
+  }
+
+  virtual bool InRange(const Slice& src) const override {
     return (*in_range_)(state_, src.data(), src.size());
   }
 };
@@ -917,18 +989,18 @@ void crocksdb_write(
   SaveError(errptr, db->rep->Write(options->rep, &batch->rep));
 }
 
-void crocksdb_write_multi_batch(
-    crocksdb_t* db,
-    const crocksdb_writeoptions_t* options,
-    crocksdb_writebatch_t** batches,
-    size_t batch_size,
-    char** errptr) {
-  std::vector<WriteBatch*> ws;
-  for (size_t i = 0; i < batch_size; i ++) {
-    ws.push_back(&batches[i]->rep);
-  }
-  SaveError(errptr, db->rep->MultiBatchWrite(options->rep, std::move(ws)));
-}
+// void crocksdb_write_multi_batch(
+//     crocksdb_t* db,
+//     const crocksdb_writeoptions_t* options,
+//     crocksdb_writebatch_t** batches,
+//     size_t batch_size,
+//     char** errptr) {
+//   std::vector<WriteBatch*> ws;
+//   for (size_t i = 0; i < batch_size; i ++) {
+//     ws.push_back(&batches[i]->rep);
+//   }
+//   SaveError(errptr, db->rep->MultiBatchWrite(options->rep, std::move(ws)));
+// }
 
 char* crocksdb_get(
     crocksdb_t* db,
@@ -2571,19 +2643,19 @@ void crocksdb_options_set_enable_pipelined_write(crocksdb_options_t *opt,
   opt->rep.enable_pipelined_write = v;
 }
 
-void crocksdb_options_set_enable_multi_batch_write(crocksdb_options_t *opt,
-                                                 unsigned char v) {
-  opt->rep.enable_multi_thread_write = v;
-}
+// void crocksdb_options_set_enable_multi_batch_write(crocksdb_options_t *opt,
+//                                                  unsigned char v) {
+//   opt->rep.enable_multi_thread_write = v;
+// }
 
 unsigned char crocksdb_options_is_enable_multi_batch_write(crocksdb_options_t *opt) {
-  return opt->rep.enable_multi_thread_write;
+  return false;
 }
 
-void crocksdb_options_set_unordered_write(crocksdb_options_t* opt,
-                                                unsigned char v) {
-  opt->rep.unordered_write = v;
-}
+// void crocksdb_options_set_unordered_write(crocksdb_options_t* opt,
+//                                                 unsigned char v) {
+//   opt->rep.unordered_write = v;
+// }
 
 void crocksdb_options_set_allow_concurrent_memtable_write(crocksdb_options_t* opt,
                                                          unsigned char v) {
@@ -2761,10 +2833,10 @@ void crocksdb_options_set_hash_link_list_rep(
   opt->rep.memtable_factory.reset(rocksdb::NewHashLinkListRepFactory(bucket_count));
 }
 
-void crocksdb_options_set_doubly_skip_list_rep(crocksdb_options_t *opt) {
-  rocksdb::MemTableRepFactory* factory = new rocksdb::DoublySkipListFactory();
-  opt->rep.memtable_factory.reset(factory);
-}
+// void crocksdb_options_set_doubly_skip_list_rep(crocksdb_options_t *opt) {
+//   rocksdb::MemTableRepFactory* factory = new rocksdb::DoublySkipListFactory();
+//   opt->rep.memtable_factory.reset(factory);
+// }
 
 void crocksdb_options_set_plain_table_factory(
     crocksdb_options_t *opt, uint32_t user_key_len, int bloom_bits_per_key,
@@ -3286,10 +3358,10 @@ void crocksdb_readoptions_set_prefix_same_as_start(crocksdb_readoptions_t* opt,
   opt->rep.prefix_same_as_start = v;
 }
 
-void crocksdb_readoptions_set_pin_data(crocksdb_readoptions_t *opt,
-                                       unsigned char v) {
-  opt->rep.pin_data = v;
-}
+// void crocksdb_readoptions_set_pin_data(crocksdb_readoptions_t *opt,
+//                                        unsigned char v) {
+//   opt->rep.pin_data = v;
+// }
 
 void crocksdb_readoptions_set_background_purge_on_iterator_cleanup(
     crocksdb_readoptions_t *opt, unsigned char v) {
@@ -4363,7 +4435,7 @@ void crocksdb_delete_files_in_ranges_cf(
   SaveError(
       errptr,
       DeleteFilesInRanges(
-          db->rep, cf->rep, &ranges[0], num_ranges, include_end));
+          db->rep, cf->rep, &ranges[0], num_ranges));
 }
 
 void crocksdb_free(void* ptr) { free(ptr); }
@@ -4420,7 +4492,12 @@ void crocksdb_pinnableslice_destroy(crocksdb_pinnableslice_t* v) { delete v; }
 
 const char* crocksdb_pinnableslice_value(const crocksdb_pinnableslice_t* v,
                                         size_t* vlen) {
-  // v can't be null.
+  if (!v) {
+    *vlen = 0;
+    return nullptr;
+  }
+
+  assert(v->rep.valid());
   *vlen = v->rep.size();
   return v->rep.data();
 }
@@ -4850,120 +4927,120 @@ int crocksdb_keyversions_type(const crocksdb_keyversions_t *kvs, int index) {
   return kvs->rep[index].type;
 }
 
-struct ExternalSstFileModifier {
-  ExternalSstFileModifier(Env *env, const EnvOptions& env_options,
-                          ColumnFamilyHandle* handle)
-      : env_(env), env_options_(env_options), handle_(handle) {}
+// struct ExternalSstFileModifier {
+//   ExternalSstFileModifier(Env *env, const EnvOptions& env_options,
+//                           ColumnFamilyHandle* handle)
+//       : env_(env), env_options_(env_options), handle_(handle) {}
 
-  Status Open(std::string file) {
-    file_ = file;
-    // Get External Sst File Size
-    uint64_t file_size;
-    auto status = env_->GetFileSize(file_, &file_size);
-    if (!status.ok()) {
-      return status;
-    }
+//   Status Open(std::string file) {
+//     file_ = file;
+//     // Get External Sst File Size
+//     uint64_t file_size;
+//     auto status = env_->GetFileSize(file_, &file_size);
+//     if (!status.ok()) {
+//       return status;
+//     }
 
-    // Open External Sst File
-    std::unique_ptr<RandomAccessFile> sst_file;
-    std::unique_ptr<RandomAccessFileReader> sst_file_reader;
-    status = env_->NewRandomAccessFile(file_, &sst_file, env_options_);
-    if (!status.ok()) {
-      return status;
-    }
-    sst_file_reader.reset(new RandomAccessFileReader(std::move(sst_file), file_));
+//     // Open External Sst File
+//     std::unique_ptr<RandomAccessFile> sst_file;
+//     std::unique_ptr<RandomAccessFileReader> sst_file_reader;
+//     status = env_->NewRandomAccessFile(file_, &sst_file, env_options_);
+//     if (!status.ok()) {
+//       return status;
+//     }
+//     sst_file_reader.reset(new RandomAccessFileReader(std::move(sst_file), file_));
 
-    // Get Table Reader
-    ColumnFamilyDescriptor desc;
-    handle_->GetDescriptor(&desc);
-    auto cfd = reinterpret_cast<ColumnFamilyHandleImpl*>(handle_)->cfd();
-    auto ioptions = *cfd->ioptions();
-    auto table_opt = TableReaderOptions(
-        ioptions, desc.options.prefix_extractor.get(), env_options_,
-        cfd->internal_comparator());
-    // Get around global seqno check.
-    table_opt.largest_seqno = kMaxSequenceNumber;
-    status = ioptions.table_factory->NewTableReader(
-        table_opt, std::move(sst_file_reader), file_size, &table_reader_);
-    return status;
-  }
+//     // Get Table Reader
+//     ColumnFamilyDescriptor desc;
+//     handle_->GetDescriptor(&desc);
+//     auto cfd = reinterpret_cast<ColumnFamilyHandleImpl*>(handle_)->cfd();
+//     auto ioptions = *cfd->ioptions();
+//     auto table_opt = TableReaderOptions(
+//         ioptions, desc.options.prefix_extractor.get(), env_options_,
+//         cfd->internal_comparator());
+//     // Get around global seqno check.
+//     table_opt.largest_seqno = kMaxSequenceNumber;
+//     status = ioptions.table_factory->NewTableReader(
+//         table_opt, std::move(sst_file_reader), file_size, &table_reader_);
+//     return status;
+//   }
 
-  Status SetGlobalSeqNo(uint64_t seq_no, uint64_t *pre_seq_no) {
-    if (table_reader_ == nullptr) {
-      return Status::InvalidArgument("File is not open or seq-no has been modified");
-    }
-    // Get the external file properties
-    auto props = table_reader_->GetTableProperties();
-    const auto& uprops = props->user_collected_properties;
-    // Validate version and seqno offset
-    auto version_iter = uprops.find(ExternalSstFilePropertyNames::kVersion);
-    if (version_iter == uprops.end()) {
-      return Status::Corruption("External file version not found");
-    }
-    uint32_t version = DecodeFixed32(version_iter->second.c_str());
-    if (version != 2) {
-      return Status::NotSupported("External file version should be 2");
-    }
+//   Status SetGlobalSeqNo(uint64_t seq_no, uint64_t *pre_seq_no) {
+//     if (table_reader_ == nullptr) {
+//       return Status::InvalidArgument("File is not open or seq-no has been modified");
+//     }
+//     // Get the external file properties
+//     auto props = table_reader_->GetTableProperties();
+//     const auto& uprops = props->user_collected_properties;
+//     // Validate version and seqno offset
+//     auto version_iter = uprops.find(ExternalSstFilePropertyNames::kVersion);
+//     if (version_iter == uprops.end()) {
+//       return Status::Corruption("External file version not found");
+//     }
+//     uint32_t version = DecodeFixed32(version_iter->second.c_str());
+//     if (version != 2) {
+//       return Status::NotSupported("External file version should be 2");
+//     }
 
-    auto seqno_iter = uprops.find(ExternalSstFilePropertyNames::kGlobalSeqno);
-    if (seqno_iter == uprops.end()) {
-      return Status::Corruption("External file global sequence number not found");
-    }
-    *pre_seq_no = DecodeFixed64(seqno_iter->second.c_str());
-    uint64_t offset = props->properties_offsets.at(ExternalSstFilePropertyNames::kGlobalSeqno);
-    if (offset == 0) {
-      return Status::Corruption("Was not able to find file global seqno field");
-    }
+//     auto seqno_iter = uprops.find(ExternalSstFilePropertyNames::kGlobalSeqno);
+//     if (seqno_iter == uprops.end()) {
+//       return Status::Corruption("External file global sequence number not found");
+//     }
+//     *pre_seq_no = DecodeFixed64(seqno_iter->second.c_str());
+//     uint64_t offset = props->properties_offsets.at(ExternalSstFilePropertyNames::kGlobalSeqno);
+//     if (offset == 0) {
+//       return Status::Corruption("Was not able to find file global seqno field");
+//     }
 
-    if (*pre_seq_no == seq_no) {
-      // This file already have the correct global seqno
-      return Status::OK();
-    }
+//     if (*pre_seq_no == seq_no) {
+//       // This file already have the correct global seqno
+//       return Status::OK();
+//     }
 
-    std::unique_ptr<RandomRWFile> rwfile;
-    auto status = env_->NewRandomRWFile(file_, &rwfile, env_options_);
-    if (!status.ok()) {
-      return status;
-    }
+//     std::unique_ptr<RandomRWFile> rwfile;
+//     auto status = env_->NewRandomRWFile(file_, &rwfile, env_options_);
+//     if (!status.ok()) {
+//       return status;
+//     }
 
-    // Write the new seqno in the global sequence number field in the file
-    std::string seqno_val;
-    PutFixed64(&seqno_val, seq_no);
-    status = rwfile->Write(offset, seqno_val);
-    return status;
-  }
+//     // Write the new seqno in the global sequence number field in the file
+//     std::string seqno_val;
+//     PutFixed64(&seqno_val, seq_no);
+//     status = rwfile->Write(offset, seqno_val);
+//     return status;
+//   }
 
-  private:
-    Env *env_;
-    EnvOptions env_options_;
-    ColumnFamilyHandle* handle_;
-    std::string file_;
-    std::unique_ptr<TableReader> table_reader_;
-};
+//   private:
+//     Env *env_;
+//     EnvOptions env_options_;
+//     ColumnFamilyHandle* handle_;
+//     std::string file_;
+//     std::unique_ptr<TableReader> table_reader_;
+// };
 
 // !!! this function is dangerous because it uses rocksdb's non-public API !!!
 // find the offset of external sst file's `global seq no` and modify it.
-uint64_t crocksdb_set_external_sst_file_global_seq_no(
-    crocksdb_t *db,
-    crocksdb_column_family_handle_t *column_family,
-    const char *file,
-    uint64_t seq_no,
-    char **errptr) {
-  auto env = db->rep->GetEnv();
-  EnvOptions env_options(db->rep->GetDBOptions());
-  ExternalSstFileModifier modifier(env, env_options, column_family->rep);
-  auto s = modifier.Open(std::string(file));
-  uint64_t pre_seq_no = 0;
-  if (!s.ok()) {
-    SaveError(errptr, s);
-    return pre_seq_no;
-  }
-  s = modifier.SetGlobalSeqNo(seq_no, &pre_seq_no);
-  if (!s.ok()) {
-    SaveError(errptr, s);
-  }
-  return pre_seq_no;
-}
+// uint64_t crocksdb_set_external_sst_file_global_seq_no(
+//     crocksdb_t *db,
+//     crocksdb_column_family_handle_t *column_family,
+//     const char *file,
+//     uint64_t seq_no,
+//     char **errptr) {
+//   auto env = db->rep->GetEnv();
+//   EnvOptions env_options(db->rep->GetDBOptions());
+//   ExternalSstFileModifier modifier(env, env_options, column_family->rep);
+//   auto s = modifier.Open(std::string(file));
+//   uint64_t pre_seq_no = 0;
+//   if (!s.ok()) {
+//     SaveError(errptr, s);
+//     return pre_seq_no;
+//   }
+//   s = modifier.SetGlobalSeqNo(seq_no, &pre_seq_no);
+//   if (!s.ok()) {
+//     SaveError(errptr, s);
+//   }
+//   return pre_seq_no;
+// }
 
 void crocksdb_get_column_family_meta_data(
     crocksdb_t* db,
@@ -5356,13 +5433,13 @@ uint64_t crocksdb_perf_context_env_new_logger_nanos(crocksdb_perf_context_t* ctx
   return ctx->rep.env_new_logger_nanos;
 }
 
-uint64_t crocksdb_perf_context_encrypt_data_nanos(crocksdb_perf_context_t* ctx) {
-  return ctx->rep.encrypt_data_nanos;
-}
+// uint64_t crocksdb_perf_context_encrypt_data_nanos(crocksdb_perf_context_t* ctx) {
+//   return ctx->rep.encrypt_data_nanos;
+// }
 
-uint64_t crocksdb_perf_context_decrypt_data_nanos(crocksdb_perf_context_t* ctx) {
-  return ctx->rep.decrypt_data_nanos;
-}
+// uint64_t crocksdb_perf_context_decrypt_data_nanos(crocksdb_perf_context_t* ctx) {
+//   return ctx->rep.decrypt_data_nanos;
+// }
 
 // IOStatsContext
 
@@ -5422,451 +5499,451 @@ void crocksdb_run_ldb_tool(int argc, char** argv, const crocksdb_options_t* opts
   LDBTool().Run(argc, argv, opts->rep);
 }
 
-/* Titan */
-struct ctitandb_options_t {
-  TitanOptions rep;
-};
+// /* Titan */
+// struct ctitandb_options_t {
+//   TitanOptions rep;
+// };
 
-crocksdb_t* ctitandb_open_column_families(
-    const char* name, 
-    const ctitandb_options_t* tdb_options, int num_column_families,
-    const char** column_family_names,
-    const ctitandb_options_t** titan_column_family_options,
-    crocksdb_column_family_handle_t** column_family_handles, char** errptr) {
-  std::vector<TitanCFDescriptor> column_families;
-  for (int i = 0; i < num_column_families; i++) {
-    column_families.push_back(
-        TitanCFDescriptor(std::string(column_family_names[i]),
-                          TitanCFOptions(titan_column_family_options[i]->rep)));
-  }
+// crocksdb_t* ctitandb_open_column_families(
+//     const char* name, 
+//     const ctitandb_options_t* tdb_options, int num_column_families,
+//     const char** column_family_names,
+//     const ctitandb_options_t** titan_column_family_options,
+//     crocksdb_column_family_handle_t** column_family_handles, char** errptr) {
+//   std::vector<TitanCFDescriptor> column_families;
+//   for (int i = 0; i < num_column_families; i++) {
+//     column_families.push_back(
+//         TitanCFDescriptor(std::string(column_family_names[i]),
+//                           TitanCFOptions(titan_column_family_options[i]->rep)));
+//   }
 
-  TitanDB* db;
-  std::vector<ColumnFamilyHandle*> handles;
-  if (SaveError(errptr, TitanDB::Open(tdb_options->rep, std::string(name),
-                                      column_families, &handles, &db))) {
-    return nullptr;
-  }
-  for (size_t i = 0; i < handles.size(); i++) {
-    crocksdb_column_family_handle_t* c_handle =
-        new crocksdb_column_family_handle_t;
-    c_handle->rep = handles[i];
-    column_family_handles[i] = c_handle;
-  }
-  crocksdb_t* result = new crocksdb_t;
-  result->rep = db;
-  return result;
-}
+//   TitanDB* db;
+//   std::vector<ColumnFamilyHandle*> handles;
+//   if (SaveError(errptr, TitanDB::Open(tdb_options->rep, std::string(name),
+//                                       column_families, &handles, &db))) {
+//     return nullptr;
+//   }
+//   for (size_t i = 0; i < handles.size(); i++) {
+//     crocksdb_column_family_handle_t* c_handle =
+//         new crocksdb_column_family_handle_t;
+//     c_handle->rep = handles[i];
+//     column_family_handles[i] = c_handle;
+//   }
+//   crocksdb_t* result = new crocksdb_t;
+//   result->rep = db;
+//   return result;
+// }
 
-// Caller should make sure `db` is created from ctitandb_open_column_families.
-//
-// TODO: ctitandb_open_column_family should return a ctitandb_t. Caller can
-// use ctitandb_t for titan specific functions.
-crocksdb_column_family_handle_t* ctitandb_create_column_family(
-    crocksdb_t* db,
-    const ctitandb_options_t* titan_column_family_options,
-    const char* column_family_name,
-    char** errptr) {
-  // Blindly cast db into TitanDB.
-  TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
-  crocksdb_column_family_handle_t* handle = new crocksdb_column_family_handle_t;
-  SaveError(errptr,
-      titan_db->CreateColumnFamily(
-          TitanCFDescriptor(std::string(column_family_name),
-                            titan_column_family_options->rep),
-          &(handle->rep)));
-  return handle;
-}
+// // Caller should make sure `db` is created from ctitandb_open_column_families.
+// //
+// // TODO: ctitandb_open_column_family should return a ctitandb_t. Caller can
+// // use ctitandb_t for titan specific functions.
+// crocksdb_column_family_handle_t* ctitandb_create_column_family(
+//     crocksdb_t* db,
+//     const ctitandb_options_t* titan_column_family_options,
+//     const char* column_family_name,
+//     char** errptr) {
+//   // Blindly cast db into TitanDB.
+//   TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
+//   crocksdb_column_family_handle_t* handle = new crocksdb_column_family_handle_t;
+//   SaveError(errptr,
+//       titan_db->CreateColumnFamily(
+//           TitanCFDescriptor(std::string(column_family_name),
+//                             titan_column_family_options->rep),
+//           &(handle->rep)));
+//   return handle;
+// }
 
-/* TitanDBOptions */
+// /* TitanDBOptions */
 
-ctitandb_options_t* ctitandb_options_create() { return new ctitandb_options_t; }
+// ctitandb_options_t* ctitandb_options_create() { return new ctitandb_options_t; }
 
-void ctitandb_options_destroy(ctitandb_options_t* opts) { delete opts; }
+// void ctitandb_options_destroy(ctitandb_options_t* opts) { delete opts; }
 
-ctitandb_options_t* ctitandb_options_copy(ctitandb_options_t* src) {
-  if (src == nullptr) {
-    return nullptr;
-  }
-  return new ctitandb_options_t{src->rep};
-}
+// ctitandb_options_t* ctitandb_options_copy(ctitandb_options_t* src) {
+//   if (src == nullptr) {
+//     return nullptr;
+//   }
+//   return new ctitandb_options_t{src->rep};
+// }
 
-void ctitandb_options_set_rocksdb_options(ctitandb_options_t* opts, const crocksdb_options_t* rocksdb_opts) {
-  *(DBOptions*)&opts->rep = rocksdb_opts->rep;
-  *(ColumnFamilyOptions*)&opts->rep = rocksdb_opts->rep;
-}
+// void ctitandb_options_set_rocksdb_options(ctitandb_options_t* opts, const crocksdb_options_t* rocksdb_opts) {
+//   *(DBOptions*)&opts->rep = rocksdb_opts->rep;
+//   *(ColumnFamilyOptions*)&opts->rep = rocksdb_opts->rep;
+// }
 
-ctitandb_options_t* ctitandb_get_titan_options_cf(
-    const crocksdb_t* db,
-    crocksdb_column_family_handle_t* column_family) {
-  ctitandb_options_t* options = new ctitandb_options_t;
-   TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
-  options->rep = titan_db->GetTitanOptions(column_family->rep);
-  return options;
-}
+// ctitandb_options_t* ctitandb_get_titan_options_cf(
+//     const crocksdb_t* db,
+//     crocksdb_column_family_handle_t* column_family) {
+//   ctitandb_options_t* options = new ctitandb_options_t;
+//    TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
+//   options->rep = titan_db->GetTitanOptions(column_family->rep);
+//   return options;
+// }
 
-ctitandb_options_t* ctitandb_get_titan_db_options(crocksdb_t* db) {
-  ctitandb_options_t* options = new ctitandb_options_t;
-  TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
-  *static_cast<TitanDBOptions*>(&options->rep) = titan_db->GetTitanDBOptions();
-  return options;
-}
+// ctitandb_options_t* ctitandb_get_titan_db_options(crocksdb_t* db) {
+//   ctitandb_options_t* options = new ctitandb_options_t;
+//   TitanDB* titan_db = reinterpret_cast<TitanDB*>(db->rep);
+//   *static_cast<TitanDBOptions*>(&options->rep) = titan_db->GetTitanDBOptions();
+//   return options;
+// }
 
-const char* ctitandb_options_dirname(ctitandb_options_t* opts) {
-  return opts->rep.dirname.c_str();
-}
+// const char* ctitandb_options_dirname(ctitandb_options_t* opts) {
+//   return opts->rep.dirname.c_str();
+// }
 
-void ctitandb_options_set_dirname(ctitandb_options_t* opts, const char* name) {
-  opts->rep.dirname = name;
-}
+// void ctitandb_options_set_dirname(ctitandb_options_t* opts, const char* name) {
+//   opts->rep.dirname = name;
+// }
 
-uint64_t ctitandb_options_min_blob_size(ctitandb_options_t* opts) {
-  return opts->rep.min_blob_size;
-}
+// uint64_t ctitandb_options_min_blob_size(ctitandb_options_t* opts) {
+//   return opts->rep.min_blob_size;
+// }
 
-void ctitandb_options_set_min_blob_size(ctitandb_options_t* opts,
-                                        uint64_t size) {
-  opts->rep.min_blob_size = size;
-}
+// void ctitandb_options_set_min_blob_size(ctitandb_options_t* opts,
+//                                         uint64_t size) {
+//   opts->rep.min_blob_size = size;
+// }
 
-int ctitandb_options_blob_file_compression(ctitandb_options_t* opts) {
-  return opts->rep.blob_file_compression;
-}
+// int ctitandb_options_blob_file_compression(ctitandb_options_t* opts) {
+//   return opts->rep.blob_file_compression;
+// }
 
-void ctitandb_options_set_blob_file_compression(ctitandb_options_t* opts,
-                                                int type) {
-  opts->rep.blob_file_compression = static_cast<CompressionType>(type);
-}
+// void ctitandb_options_set_blob_file_compression(ctitandb_options_t* opts,
+//                                                 int type) {
+//   opts->rep.blob_file_compression = static_cast<CompressionType>(type);
+// }
 
-void ctitandb_options_set_gc_merge_rewrite(ctitandb_options_t* opts,
-                                               unsigned char enable) {
-  opts->rep.gc_merge_rewrite = enable;
-}
+// void ctitandb_options_set_gc_merge_rewrite(ctitandb_options_t* opts,
+//                                                unsigned char enable) {
+//   opts->rep.gc_merge_rewrite = enable;
+// }
 
-void ctitandb_decode_blob_index(const char* value, size_t value_size,
-                                ctitandb_blob_index_t* index, char** errptr) {
-  Slice v(value, value_size);
-  BlobIndex bi;
-  if (SaveError(errptr, bi.DecodeFrom(&v))) {
-    return;
-  }
-  index->file_number = bi.file_number;
-  index->blob_offset = bi.blob_handle.offset;
-  index->blob_size = bi.blob_handle.size;
-}
+// void ctitandb_decode_blob_index(const char* value, size_t value_size,
+//                                 ctitandb_blob_index_t* index, char** errptr) {
+//   Slice v(value, value_size);
+//   BlobIndex bi;
+//   if (SaveError(errptr, bi.DecodeFrom(&v))) {
+//     return;
+//   }
+//   index->file_number = bi.file_number;
+//   index->blob_offset = bi.blob_handle.offset;
+//   index->blob_size = bi.blob_handle.size;
+// }
 
-void ctitandb_encode_blob_index(const ctitandb_blob_index_t* index,
-                                char** value, size_t* value_size) {
-  BlobIndex bi;
-  bi.file_number = index->file_number;
-  bi.blob_handle.offset = index->blob_offset;
-  bi.blob_handle.size = index->blob_size;
-  std::string result;
-  bi.EncodeTo(&result);
-  *value = CopyString(result);
-  *value_size = result.size();
-}
+// void ctitandb_encode_blob_index(const ctitandb_blob_index_t* index,
+//                                 char** value, size_t* value_size) {
+//   BlobIndex bi;
+//   bi.file_number = index->file_number;
+//   bi.blob_handle.offset = index->blob_offset;
+//   bi.blob_handle.size = index->blob_size;
+//   std::string result;
+//   bi.EncodeTo(&result);
+//   *value = CopyString(result);
+//   *value_size = result.size();
+// }
 
-void ctitandb_options_set_disable_background_gc(ctitandb_options_t* options,
-                                                unsigned char disable) {
-  options->rep.disable_background_gc = disable;
-}
+// void ctitandb_options_set_disable_background_gc(ctitandb_options_t* options,
+//                                                 unsigned char disable) {
+//   options->rep.disable_background_gc = disable;
+// }
 
-void ctitandb_options_set_level_merge(ctitandb_options_t* options,
-                                                unsigned char enable) {
-  options->rep.level_merge = enable;
-}
+// void ctitandb_options_set_level_merge(ctitandb_options_t* options,
+//                                                 unsigned char enable) {
+//   options->rep.level_merge = enable;
+// }
 
-void ctitandb_options_set_range_merge(ctitandb_options_t* options,
-                                                unsigned char enable) {
-  options->rep.range_merge = enable;
-}
+// void ctitandb_options_set_range_merge(ctitandb_options_t* options,
+//                                                 unsigned char enable) {
+//   options->rep.range_merge = enable;
+// }
 
-void ctitandb_options_set_max_sorted_runs(ctitandb_options_t* options,
-                                            int size) {
-  options->rep.max_sorted_runs = size;
-}
+// void ctitandb_options_set_max_sorted_runs(ctitandb_options_t* options,
+//                                             int size) {
+//   options->rep.max_sorted_runs = size;
+// }
 
-void ctitandb_options_set_max_gc_batch_size(ctitandb_options_t* options,
-                                            uint64_t size) {
-  options->rep.max_gc_batch_size = size;
-}
+// void ctitandb_options_set_max_gc_batch_size(ctitandb_options_t* options,
+//                                             uint64_t size) {
+//   options->rep.max_gc_batch_size = size;
+// }
 
-void ctitandb_options_set_min_gc_batch_size(ctitandb_options_t* options,
-                                            uint64_t size) {
-  options->rep.min_gc_batch_size = size;
-}
+// void ctitandb_options_set_min_gc_batch_size(ctitandb_options_t* options,
+//                                             uint64_t size) {
+//   options->rep.min_gc_batch_size = size;
+// }
 
-void ctitandb_options_set_blob_file_discardable_ratio(
-    ctitandb_options_t* options, double ratio) {
-  options->rep.blob_file_discardable_ratio = ratio;
-}
+// void ctitandb_options_set_blob_file_discardable_ratio(
+//     ctitandb_options_t* options, double ratio) {
+//   options->rep.blob_file_discardable_ratio = ratio;
+// }
 
-void ctitandb_options_set_sample_file_size_ratio(ctitandb_options_t* options,
-                                                 double ratio) {
-  options->rep.sample_file_size_ratio = ratio;
-}
+// void ctitandb_options_set_sample_file_size_ratio(ctitandb_options_t* options,
+//                                                  double ratio) {
+//   options->rep.sample_file_size_ratio = ratio;
+// }
 
-void ctitandb_options_set_merge_small_file_threshold(
-    ctitandb_options_t* options, uint64_t size) {
-  options->rep.merge_small_file_threshold = size;
-}
+// void ctitandb_options_set_merge_small_file_threshold(
+//     ctitandb_options_t* options, uint64_t size) {
+//   options->rep.merge_small_file_threshold = size;
+// }
 
-void ctitandb_options_set_max_background_gc(ctitandb_options_t* options,
-                                            int32_t size) {
-  options->rep.max_background_gc = size;
-}
+// void ctitandb_options_set_max_background_gc(ctitandb_options_t* options,
+//                                             int32_t size) {
+//   options->rep.max_background_gc = size;
+// }
 
-void ctitandb_options_set_purge_obsolete_files_period_sec(
-    ctitandb_options_t* options, unsigned int period) {
-  options->rep.purge_obsolete_files_period_sec = period;
-}
+// void ctitandb_options_set_purge_obsolete_files_period_sec(
+//     ctitandb_options_t* options, unsigned int period) {
+//   options->rep.purge_obsolete_files_period_sec = period;
+// }
 
-void ctitandb_options_set_blob_cache(ctitandb_options_t* options,
-                                     crocksdb_cache_t* cache) {
-  if (cache) {
-    options->rep.blob_cache = cache->rep;
-  }
-}
+// void ctitandb_options_set_blob_cache(ctitandb_options_t* options,
+//                                      crocksdb_cache_t* cache) {
+//   if (cache) {
+//     options->rep.blob_cache = cache->rep;
+//   }
+// }
 
-size_t ctitandb_options_get_blob_cache_usage(ctitandb_options_t *opt) {
-  if (opt && opt->rep.blob_cache != nullptr) {
-    return opt->rep.blob_cache->GetUsage();
-  }
-  return 0;
-}
+// size_t ctitandb_options_get_blob_cache_usage(ctitandb_options_t *opt) {
+//   if (opt && opt->rep.blob_cache != nullptr) {
+//     return opt->rep.blob_cache->GetUsage();
+//   }
+//   return 0;
+// }
 
-void ctitandb_options_set_blob_cache_capacity(ctitandb_options_t* opt, size_t capacity, char **errptr) {
-  Status s;
-  if (opt && opt->rep.blob_cache != nullptr) {
-    return opt->rep.blob_cache->SetCapacity(capacity);
-  } else {
-    s = Status::InvalidArgument("Blob cache was disabled.");
-  }
-  SaveError(errptr, s);
-}
+// void ctitandb_options_set_blob_cache_capacity(ctitandb_options_t* opt, size_t capacity, char **errptr) {
+//   Status s;
+//   if (opt && opt->rep.blob_cache != nullptr) {
+//     return opt->rep.blob_cache->SetCapacity(capacity);
+//   } else {
+//     s = Status::InvalidArgument("Blob cache was disabled.");
+//   }
+//   SaveError(errptr, s);
+// }
 
-size_t ctitandb_options_get_blob_cache_capacity(ctitandb_options_t* opt) {
-  if (opt && opt->rep.blob_cache != nullptr) {
-    return opt->rep.blob_cache->GetCapacity();
-  }
-  return 0;
-}
+// size_t ctitandb_options_get_blob_cache_capacity(ctitandb_options_t* opt) {
+//   if (opt && opt->rep.blob_cache != nullptr) {
+//     return opt->rep.blob_cache->GetCapacity();
+//   }
+//   return 0;
+// }
 
-void ctitandb_options_set_discardable_ratio(ctitandb_options_t* options,
-                                            double ratio) {
-  options->rep.blob_file_discardable_ratio = ratio;
-}
+// void ctitandb_options_set_discardable_ratio(ctitandb_options_t* options,
+//                                             double ratio) {
+//   options->rep.blob_file_discardable_ratio = ratio;
+// }
 
-void ctitandb_options_set_sample_ratio(ctitandb_options_t* options,
-                                       double ratio) {
-  options->rep.sample_file_size_ratio = ratio;
-}
+// void ctitandb_options_set_sample_ratio(ctitandb_options_t* options,
+//                                        double ratio) {
+//   options->rep.sample_file_size_ratio = ratio;
+// }
 
-void ctitandb_options_set_blob_run_mode(ctitandb_options_t* options,
-                                        int mode) {
-  options->rep.blob_run_mode = static_cast<TitanBlobRunMode>(mode);
-}
+// void ctitandb_options_set_blob_run_mode(ctitandb_options_t* options,
+//                                         int mode) {
+//   options->rep.blob_run_mode = static_cast<TitanBlobRunMode>(mode);
+// }
 
-/* TitanReadOptions */
-struct ctitandb_readoptions_t {
-  TitanReadOptions rep;
-};
+// /* TitanReadOptions */
+// struct ctitandb_readoptions_t {
+//   TitanReadOptions rep;
+// };
 
-ctitandb_readoptions_t* ctitandb_readoptions_create() {
-  return new ctitandb_readoptions_t;
-}
+// ctitandb_readoptions_t* ctitandb_readoptions_create() {
+//   return new ctitandb_readoptions_t;
+// }
 
-void ctitandb_readoptions_destroy(ctitandb_readoptions_t* opts) {
-  delete opts;
-}
+// void ctitandb_readoptions_destroy(ctitandb_readoptions_t* opts) {
+//   delete opts;
+// }
 
-unsigned char ctitandb_readoptions_key_only(ctitandb_readoptions_t* opts) {
-  return opts->rep.key_only;
-}
+// unsigned char ctitandb_readoptions_key_only(ctitandb_readoptions_t* opts) {
+//   return opts->rep.key_only;
+// }
 
-void ctitandb_readoptions_set_key_only(ctitandb_readoptions_t* opts,
-                                        unsigned char v) {
-  opts->rep.key_only = v;
-}
+// void ctitandb_readoptions_set_key_only(ctitandb_readoptions_t* opts,
+//                                         unsigned char v) {
+//   opts->rep.key_only = v;
+// }
 
-crocksdb_iterator_t* ctitandb_create_iterator(
-    crocksdb_t* db,
-    const crocksdb_readoptions_t* options,
-    const ctitandb_readoptions_t* titan_options) {
-  crocksdb_iterator_t* result = new crocksdb_iterator_t;
-  if (titan_options == nullptr) {
-    result->rep = db->rep->NewIterator(options->rep);
-  } else {
-    *(ReadOptions*)&titan_options->rep = options->rep;
-    result->rep = static_cast<TitanDB*>(db->rep)->NewIterator(titan_options->rep);
-  }
-  return result;
-}
+// crocksdb_iterator_t* ctitandb_create_iterator(
+//     crocksdb_t* db,
+//     const crocksdb_readoptions_t* options,
+//     const ctitandb_readoptions_t* titan_options) {
+//   crocksdb_iterator_t* result = new crocksdb_iterator_t;
+//   if (titan_options == nullptr) {
+//     result->rep = db->rep->NewIterator(options->rep);
+//   } else {
+//     *(ReadOptions*)&titan_options->rep = options->rep;
+//     result->rep = static_cast<TitanDB*>(db->rep)->NewIterator(titan_options->rep);
+//   }
+//   return result;
+// }
 
-crocksdb_iterator_t* ctitandb_create_iterator_cf(
-    crocksdb_t* db,
-    const crocksdb_readoptions_t* options,
-    const ctitandb_readoptions_t* titan_options,
-    crocksdb_column_family_handle_t* column_family) {
-  crocksdb_iterator_t* result = new crocksdb_iterator_t;
-  if (titan_options == nullptr) {
-    result->rep = db->rep->NewIterator(options->rep, column_family->rep);
-  } else {
-    *(ReadOptions*)&titan_options->rep = options->rep;
-    result->rep = static_cast<TitanDB*>(db->rep)->NewIterator(titan_options->rep, column_family->rep);
-  }
-  return result;
-}
+// crocksdb_iterator_t* ctitandb_create_iterator_cf(
+//     crocksdb_t* db,
+//     const crocksdb_readoptions_t* options,
+//     const ctitandb_readoptions_t* titan_options,
+//     crocksdb_column_family_handle_t* column_family) {
+//   crocksdb_iterator_t* result = new crocksdb_iterator_t;
+//   if (titan_options == nullptr) {
+//     result->rep = db->rep->NewIterator(options->rep, column_family->rep);
+//   } else {
+//     *(ReadOptions*)&titan_options->rep = options->rep;
+//     result->rep = static_cast<TitanDB*>(db->rep)->NewIterator(titan_options->rep, column_family->rep);
+//   }
+//   return result;
+// }
 
-void ctitandb_create_iterators(
-    crocksdb_t *db,
-    crocksdb_readoptions_t* options,
-    ctitandb_readoptions_t* titan_options,
-    crocksdb_column_family_handle_t** column_families,
-    crocksdb_iterator_t** iterators,
-    size_t size,
-    char** errptr) {
-  std::vector<ColumnFamilyHandle*> column_families_vec(size);
-  for (size_t i = 0; i < size; i++) {
-    column_families_vec.push_back(column_families[i]->rep);
-  }
+// void ctitandb_create_iterators(
+//     crocksdb_t *db,
+//     crocksdb_readoptions_t* options,
+//     ctitandb_readoptions_t* titan_options,
+//     crocksdb_column_family_handle_t** column_families,
+//     crocksdb_iterator_t** iterators,
+//     size_t size,
+//     char** errptr) {
+//   std::vector<ColumnFamilyHandle*> column_families_vec(size);
+//   for (size_t i = 0; i < size; i++) {
+//     column_families_vec.push_back(column_families[i]->rep);
+//   }
 
-  std::vector<Iterator*> res;
-  Status status;
-  if (titan_options == nullptr) {
-    status = db->rep->NewIterators(options->rep, column_families_vec, &res);
-  } else {
-    *(ReadOptions*)&titan_options->rep = options->rep;
-    status = static_cast<TitanDB*>(db->rep)->NewIterators(titan_options->rep, column_families_vec, &res);
-  }
-  if (SaveError(errptr, status)) {
-    for (size_t i = 0; i < res.size(); i++) {
-      delete res[i];
-    }
-    return;
-  }
-  assert(res.size() == size);
+//   std::vector<Iterator*> res;
+//   Status status;
+//   if (titan_options == nullptr) {
+//     status = db->rep->NewIterators(options->rep, column_families_vec, &res);
+//   } else {
+//     *(ReadOptions*)&titan_options->rep = options->rep;
+//     status = static_cast<TitanDB*>(db->rep)->NewIterators(titan_options->rep, column_families_vec, &res);
+//   }
+//   if (SaveError(errptr, status)) {
+//     for (size_t i = 0; i < res.size(); i++) {
+//       delete res[i];
+//     }
+//     return;
+//   }
+//   assert(res.size() == size);
 
-  for (size_t i = 0; i < size; i++) {
-    iterators[i] = new crocksdb_iterator_t;
-    iterators[i]->rep = res[i];
-  }
-}
+//   for (size_t i = 0; i < size; i++) {
+//     iterators[i] = new crocksdb_iterator_t;
+//     iterators[i]->rep = res[i];
+//   }
+// }
 
-void ctitandb_delete_files_in_range(
-    crocksdb_t* db,
-    const char* start_key, size_t start_key_len,
-    const char* limit_key, size_t limit_key_len,
-    unsigned char include_end, char** errptr) {
-  Slice a, b;
-  RangePtr range(
-    start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
-    limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
+// void ctitandb_delete_files_in_range(
+//     crocksdb_t* db,
+//     const char* start_key, size_t start_key_len,
+//     const char* limit_key, size_t limit_key_len,
+//     unsigned char include_end, char** errptr) {
+//   Slice a, b;
+//   RangePtr range(
+//     start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
+//     limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
 
-  SaveError(
-      errptr,
-      static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
-          db->rep->DefaultColumnFamily(),
-          &range, 1,
-          include_end));
-}
+//   SaveError(
+//       errptr,
+//       static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
+//           db->rep->DefaultColumnFamily(),
+//           &range, 1,
+//           include_end));
+// }
 
-void ctitandb_delete_files_in_range_cf(
-    crocksdb_t* db, crocksdb_column_family_handle_t* column_family,
-    const char* start_key, size_t start_key_len,
-    const char* limit_key, size_t limit_key_len,
-    unsigned char include_end, char** errptr) {
-  Slice a, b;
-  RangePtr range(
-    start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
-    limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
+// void ctitandb_delete_files_in_range_cf(
+//     crocksdb_t* db, crocksdb_column_family_handle_t* column_family,
+//     const char* start_key, size_t start_key_len,
+//     const char* limit_key, size_t limit_key_len,
+//     unsigned char include_end, char** errptr) {
+//   Slice a, b;
+//   RangePtr range(
+//     start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
+//     limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
 
-  SaveError(
-      errptr,
-      static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
-          column_family->rep,
-          &range, 1,
-          include_end));
-}
+//   SaveError(
+//       errptr,
+//       static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
+//           column_family->rep,
+//           &range, 1,
+//           include_end));
+// }
 
-void ctitandb_delete_files_in_ranges_cf(
-    crocksdb_t* db, crocksdb_column_family_handle_t* cf,
-    const char* const* start_keys, const size_t* start_keys_lens,
-    const char* const* limit_keys, const size_t* limit_keys_lens,
-    size_t num_ranges, unsigned char include_end, char** errptr) {
-  std::vector<Slice> starts(num_ranges);
-  std::vector<Slice> limits(num_ranges);
-  std::vector<RangePtr> ranges(num_ranges);
-  for (auto i = 0; i < num_ranges; i++) {
-    const Slice* start = nullptr;
-    if (start_keys[i]) {
-      starts[i] = Slice(start_keys[i], start_keys_lens[i]);
-      start = &starts[i];
-    }
-    const Slice* limit = nullptr;
-    if (limit_keys[i]) {
-      limits[i] = Slice(limit_keys[i], limit_keys_lens[i]);
-      limit = &limits[i];
-    }
-    ranges[i] = RangePtr(start, limit);
-  }
-  SaveError(
-      errptr,
-      static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
-          cf->rep, &ranges[0], num_ranges, include_end));
-}
+// void ctitandb_delete_files_in_ranges_cf(
+//     crocksdb_t* db, crocksdb_column_family_handle_t* cf,
+//     const char* const* start_keys, const size_t* start_keys_lens,
+//     const char* const* limit_keys, const size_t* limit_keys_lens,
+//     size_t num_ranges, unsigned char include_end, char** errptr) {
+//   std::vector<Slice> starts(num_ranges);
+//   std::vector<Slice> limits(num_ranges);
+//   std::vector<RangePtr> ranges(num_ranges);
+//   for (auto i = 0; i < num_ranges; i++) {
+//     const Slice* start = nullptr;
+//     if (start_keys[i]) {
+//       starts[i] = Slice(start_keys[i], start_keys_lens[i]);
+//       start = &starts[i];
+//     }
+//     const Slice* limit = nullptr;
+//     if (limit_keys[i]) {
+//       limits[i] = Slice(limit_keys[i], limit_keys_lens[i]);
+//       limit = &limits[i];
+//     }
+//     ranges[i] = RangePtr(start, limit);
+//   }
+//   SaveError(
+//       errptr,
+//       static_cast<TitanDB*>(db->rep)->DeleteFilesInRanges(
+//           cf->rep, &ranges[0], num_ranges, include_end));
+// }
 
-void ctitandb_delete_blob_files_in_range(crocksdb_t* db, const char* start_key,
-                                         size_t start_key_len,
-                                         const char* limit_key,
-                                         size_t limit_key_len,
-                                         unsigned char include_end,
-                                         char** errptr) {
-  Slice a, b;
-  RangePtr range(
-      start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
-      limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
+// void ctitandb_delete_blob_files_in_range(crocksdb_t* db, const char* start_key,
+//                                          size_t start_key_len,
+//                                          const char* limit_key,
+//                                          size_t limit_key_len,
+//                                          unsigned char include_end,
+//                                          char** errptr) {
+//   Slice a, b;
+//   RangePtr range(
+//       start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
+//       limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
 
-  SaveError(errptr,
-            static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
-                db->rep->DefaultColumnFamily(), &range, 1, include_end));
-}
+//   SaveError(errptr,
+//             static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
+//                 db->rep->DefaultColumnFamily(), &range, 1, include_end));
+// }
 
-void ctitandb_delete_blob_files_in_range_cf(
-    crocksdb_t* db, crocksdb_column_family_handle_t* column_family,
-    const char* start_key, size_t start_key_len, const char* limit_key,
-    size_t limit_key_len, unsigned char include_end, char** errptr) {
-  Slice a, b;
-  RangePtr range(
-      start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
-      limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
+// void ctitandb_delete_blob_files_in_range_cf(
+//     crocksdb_t* db, crocksdb_column_family_handle_t* column_family,
+//     const char* start_key, size_t start_key_len, const char* limit_key,
+//     size_t limit_key_len, unsigned char include_end, char** errptr) {
+//   Slice a, b;
+//   RangePtr range(
+//       start_key ? (a = Slice(start_key, start_key_len), &a) : nullptr,
+//       limit_key ? (b = Slice(limit_key, limit_key_len), &b) : nullptr);
 
-  SaveError(errptr, static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
-                        column_family->rep, &range, 1, include_end));
-}
+//   SaveError(errptr, static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
+//                         column_family->rep, &range, 1, include_end));
+// }
 
-void ctitandb_delete_blob_files_in_ranges_cf(
-    crocksdb_t* db, crocksdb_column_family_handle_t* cf,
-    const char* const* start_keys, const size_t* start_keys_lens,
-    const char* const* limit_keys, const size_t* limit_keys_lens,
-    size_t num_ranges, unsigned char include_end, char** errptr) {
-  std::vector<Slice> starts(num_ranges);
-  std::vector<Slice> limits(num_ranges);
-  std::vector<RangePtr> ranges(num_ranges);
-  for (auto i = 0; i < num_ranges; i++) {
-    const Slice* start = nullptr;
-    if (start_keys[i]) {
-      starts[i] = Slice(start_keys[i], start_keys_lens[i]);
-      start = &starts[i];
-    }
-    const Slice* limit = nullptr;
-    if (limit_keys[i]) {
-      limits[i] = Slice(limit_keys[i], limit_keys_lens[i]);
-      limit = &limits[i];
-    }
-    ranges[i] = RangePtr(start, limit);
-  }
-  SaveError(errptr, static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
-                        cf->rep, &ranges[0], num_ranges, include_end));
-}
+// void ctitandb_delete_blob_files_in_ranges_cf(
+//     crocksdb_t* db, crocksdb_column_family_handle_t* cf,
+//     const char* const* start_keys, const size_t* start_keys_lens,
+//     const char* const* limit_keys, const size_t* limit_keys_lens,
+//     size_t num_ranges, unsigned char include_end, char** errptr) {
+//   std::vector<Slice> starts(num_ranges);
+//   std::vector<Slice> limits(num_ranges);
+//   std::vector<RangePtr> ranges(num_ranges);
+//   for (auto i = 0; i < num_ranges; i++) {
+//     const Slice* start = nullptr;
+//     if (start_keys[i]) {
+//       starts[i] = Slice(start_keys[i], start_keys_lens[i]);
+//       start = &starts[i];
+//     }
+//     const Slice* limit = nullptr;
+//     if (limit_keys[i]) {
+//       limits[i] = Slice(limit_keys[i], limit_keys_lens[i]);
+//       limit = &limits[i];
+//     }
+//     ranges[i] = RangePtr(start, limit);
+//   }
+//   SaveError(errptr, static_cast<TitanDB*>(db->rep)->DeleteBlobFilesInRanges(
+//                         cf->rep, &ranges[0], num_ranges, include_end));
+// }
 }  // end extern "C"

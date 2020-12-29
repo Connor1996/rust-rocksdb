@@ -76,8 +76,8 @@ fn main() {
 
     build.cpp(true).file("crocksdb/c.cc");
     if !cfg!(target_os = "windows") {
-        build.flag("-std=c++11");
-        build.flag("-fno-rtti");
+        build.flag("-std=c++14");
+        // build.flag("-fno-rtti");
     }
     link_cpp(&mut build);
     build.warnings(false).compile("libcrocksdb.a");
@@ -163,6 +163,7 @@ fn build_rocksdb() -> Build {
         .define("WITH_SNAPPY", "ON")
         .define("WITH_TESTS", "OFF")
         .define("WITH_TOOLS", "OFF")
+        .define("WITH_TERARK_ZIP", "OFF")
         .build_target("terarkdb")
         .very_verbose(true)
         .build();
@@ -200,7 +201,7 @@ fn build_rocksdb() -> Build {
         build.define("OPENSSL", None);
     }
 
-    println!("cargo:rustc-link-lib=static=rocksdb");
+    println!("cargo:rustc-link-lib=static=terarkdb");
     // println!("cargo:rustc-link-lib=static=titan");
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");

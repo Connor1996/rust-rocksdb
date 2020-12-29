@@ -19,7 +19,7 @@ pub enum PerfLevel {
     Disable,
     EnableCount,
     EnableTimeExceptForMutex,
-    EnableTimeAndCPUTimeExceptForMutex,
+    // EnableTimeAndCPUTimeExceptForMutex,
     EnableTime,
     OutOfBounds,
 }
@@ -31,9 +31,9 @@ pub fn get_perf_level() -> PerfLevel {
         1 => PerfLevel::Disable,
         2 => PerfLevel::EnableCount,
         3 => PerfLevel::EnableTimeExceptForMutex,
-        4 => PerfLevel::EnableTimeAndCPUTimeExceptForMutex,
-        5 => PerfLevel::EnableTime,
-        6 => PerfLevel::OutOfBounds,
+        // 4 => PerfLevel::EnableTimeAndCPUTimeExceptForMutex,
+        4 => PerfLevel::EnableTime,
+        5 => PerfLevel::OutOfBounds,
         _ => unreachable!(),
     }
 }
@@ -44,9 +44,9 @@ pub fn set_perf_level(level: PerfLevel) {
         PerfLevel::Disable => 1,
         PerfLevel::EnableCount => 2,
         PerfLevel::EnableTimeExceptForMutex => 3,
-        PerfLevel::EnableTimeAndCPUTimeExceptForMutex => 4,
-        PerfLevel::EnableTime => 5,
-        PerfLevel::OutOfBounds => 6,
+        // PerfLevel::EnableTimeAndCPUTimeExceptForMutex => 4,
+        PerfLevel::EnableTime => 4,
+        PerfLevel::OutOfBounds => 5,
     };
     unsafe {
         crocksdb_ffi::crocksdb_set_perf_level(v);
@@ -469,45 +469,45 @@ mod test {
         assert_ne!(ctx.seek_internal_seek_time(), 0);
     }
 
-    #[test]
-    fn test_iostats_context() {
-        let temp_dir = tempdir_with_prefix("test_iostats_context");
-        let mut opts = DBOptions::new();
-        opts.create_if_missing(true);
-        let db = DB::open(opts, temp_dir.path().to_str().unwrap()).unwrap();
+    // #[test]
+    // fn test_iostats_context() {
+    //     let temp_dir = tempdir_with_prefix("test_iostats_context");
+    //     let mut opts = DBOptions::new();
+    //     opts.create_if_missing(true);
+    //     let db = DB::open(opts, temp_dir.path().to_str().unwrap()).unwrap();
 
-        set_perf_level(PerfLevel::EnableTime);
-        let mut ctx = IOStatsContext::get();
+    //     set_perf_level(PerfLevel::EnableTime);
+    //     let mut ctx = IOStatsContext::get();
 
-        ctx.reset();
-        assert_eq!(ctx.bytes_written(), 0);
-        assert_eq!(ctx.bytes_read(), 0);
-        assert_eq!(ctx.open_nanos(), 0);
-        assert_eq!(ctx.allocate_nanos(), 0);
-        assert_eq!(ctx.write_nanos(), 0);
-        assert_eq!(ctx.read_nanos(), 0);
-        assert_eq!(ctx.range_sync_nanos(), 0);
-        assert_eq!(ctx.fsync_nanos(), 0);
-        assert_eq!(ctx.prepare_write_nanos(), 0);
-        assert_eq!(ctx.logger_nanos(), 0);
+    //     ctx.reset();
+    //     assert_eq!(ctx.bytes_written(), 0);
+    //     assert_eq!(ctx.bytes_read(), 0);
+    //     assert_eq!(ctx.open_nanos(), 0);
+    //     assert_eq!(ctx.allocate_nanos(), 0);
+    //     assert_eq!(ctx.write_nanos(), 0);
+    //     assert_eq!(ctx.read_nanos(), 0);
+    //     assert_eq!(ctx.range_sync_nanos(), 0);
+    //     assert_eq!(ctx.fsync_nanos(), 0);
+    //     assert_eq!(ctx.prepare_write_nanos(), 0);
+    //     assert_eq!(ctx.logger_nanos(), 0);
 
-        let mut wopts = WriteOptions::new();
-        wopts.set_sync(true);
-        let n = 10;
-        for i in 0..n {
-            let k = &[i as u8];
-            db.put_opt(k, k, &wopts).unwrap();
-            db.flush(true).unwrap();
-            assert_eq!(db.get(k).unwrap().unwrap(), k);
-        }
+    //     let mut wopts = WriteOptions::new();
+    //     wopts.set_sync(true);
+    //     let n = 10;
+    //     for i in 0..n {
+    //         let k = &[i as u8];
+    //         db.put_opt(k, k, &wopts).unwrap();
+    //         db.flush(true).unwrap();
+    //         assert_eq!(db.get(k).unwrap().unwrap(), k);
+    //     }
 
-        assert!(ctx.bytes_written() > 0);
-        assert!(ctx.bytes_read() > 0);
-        assert!(ctx.open_nanos() > 0);
-        assert!(ctx.write_nanos() > 0);
-        assert!(ctx.read_nanos() > 0);
-        assert!(ctx.fsync_nanos() > 0);
-        assert!(ctx.prepare_write_nanos() > 0);
-        assert!(ctx.logger_nanos() > 0);
-    }
+    //     assert!(ctx.bytes_written() > 0);
+    //     assert!(ctx.bytes_read() > 0);
+    //     assert!(ctx.open_nanos() > 0);
+    //     assert!(ctx.write_nanos() > 0);
+    //     assert!(ctx.read_nanos() > 0);
+    //     assert!(ctx.fsync_nanos() > 0);
+    //     assert!(ctx.prepare_write_nanos() > 0);
+    //     assert!(ctx.logger_nanos() > 0);
+    // }
 }

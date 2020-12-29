@@ -2737,23 +2737,23 @@ impl Drop for MemoryAllocator {
     }
 }
 
-pub fn set_external_sst_file_global_seq_no(
-    db: &DB,
-    cf: &CFHandle,
-    file: &str,
-    seq_no: u64,
-) -> Result<u64, String> {
-    let cfile = CString::new(file).unwrap();
-    unsafe {
-        let pre_seq_no = ffi_try!(crocksdb_set_external_sst_file_global_seq_no(
-            db.inner,
-            cf.inner,
-            cfile.as_ptr(),
-            seq_no
-        ));
-        Ok(pre_seq_no)
-    }
-}
+// pub fn set_external_sst_file_global_seq_no(
+//     db: &DB,
+//     cf: &CFHandle,
+//     file: &str,
+//     seq_no: u64,
+// ) -> Result<u64, String> {
+//     let cfile = CString::new(file).unwrap();
+//     unsafe {
+//         let pre_seq_no = ffi_try!(crocksdb_set_external_sst_file_global_seq_no(
+//             db.inner,
+//             cf.inner,
+//             cfile.as_ptr(),
+//             seq_no
+//         ));
+//         Ok(pre_seq_no)
+//     }
+// }
 
 pub fn load_latest_options(
     dbpath: &str,
@@ -3371,28 +3371,28 @@ mod test {
         assert!(mp.is_some());
     }
 
-    #[test]
-    fn test_multi_batch_write() {
-        let mut opts = DBOptions::new();
-        opts.create_if_missing(true);
-        opts.enable_multi_batch_write(true);
-        let path = tempdir_with_prefix("_rust_rocksdb_multi_batch");
+    // #[test]
+    // fn test_multi_batch_write() {
+    //     let mut opts = DBOptions::new();
+    //     opts.create_if_missing(true);
+    //     opts.enable_multi_batch_write(true);
+    //     let path = tempdir_with_prefix("_rust_rocksdb_multi_batch");
 
-        let db = DB::open(opts, path.path().to_str().unwrap()).unwrap();
-        let cf = db.cf_handle("default").unwrap();
-        let mut data = Vec::new();
-        for s in &[b"ab", b"cd", b"ef"] {
-            let w = WriteBatch::new();
-            w.put_cf(cf, s.to_vec().as_slice(), b"a").unwrap();
-            data.push(w);
-        }
-        db.multi_batch_write(&data, &WriteOptions::new()).unwrap();
-        for s in &[b"ab", b"cd", b"ef"] {
-            let v = db.get_cf(cf, s.to_vec().as_slice()).unwrap();
-            assert!(v.is_some());
-            assert_eq!(v.unwrap().to_utf8().unwrap(), "a");
-        }
-    }
+    //     let db = DB::open(opts, path.path().to_str().unwrap()).unwrap();
+    //     let cf = db.cf_handle("default").unwrap();
+    //     let mut data = Vec::new();
+    //     for s in &[b"ab", b"cd", b"ef"] {
+    //         let w = WriteBatch::new();
+    //         w.put_cf(cf, s.to_vec().as_slice(), b"a").unwrap();
+    //         data.push(w);
+    //     }
+    //     db.multi_batch_write(&data, &WriteOptions::new()).unwrap();
+    //     for s in &[b"ab", b"cd", b"ef"] {
+    //         let v = db.get_cf(cf, s.to_vec().as_slice()).unwrap();
+    //         assert!(v.is_some());
+    //         assert_eq!(v.unwrap().to_utf8().unwrap(), "a");
+    //     }
+    // }
 
     #[test]
     fn test_get_db_path_from_option() {

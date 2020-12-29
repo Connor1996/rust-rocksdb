@@ -2014,13 +2014,13 @@ extern "C" {
 
     pub fn crocksdb_keyversions_type(kvs: *mut DBKeyVersions, index: usize) -> c_int;
 
-    pub fn crocksdb_set_external_sst_file_global_seq_no(
-        db: *mut DBInstance,
-        handle: *mut DBCFHandle,
-        file: *const c_char,
-        seq_no: u64,
-        err: *mut *mut c_char,
-    ) -> u64;
+    // pub fn crocksdb_set_external_sst_file_global_seq_no(
+    //     db: *mut DBInstance,
+    //     handle: *mut DBCFHandle,
+    //     file: *const c_char,
+    //     seq_no: u64,
+    //     err: *mut *mut c_char,
+    // ) -> u64;
 
     pub fn crocksdb_get_column_family_meta_data(
         db: *mut DBInstance,
