@@ -302,6 +302,14 @@ pub enum CompactionReason {
     Flush,
     // Compaction caused by external sst file ingestion
     ExternalSstIngestion,
+    // Reduce size or read amplification in composite sst
+    CompositeAmplification,
+    // Trivial move level
+    TrivialMoveLevel,
+    // kv separate GC.
+    GarbageCollection,
+    // Found RangeDeletion
+    RangeDeletion,
     // total number of compaction reasons, new reasons must be added above this.
     NumOfReasons,
 }
