@@ -134,6 +134,7 @@ typedef struct crocksdb_table_properties_collector_factory_t
     crocksdb_table_properties_collector_factory_t;
 typedef struct crocksdb_flushjobinfo_t crocksdb_flushjobinfo_t;
 typedef struct crocksdb_compactionjobinfo_t crocksdb_compactionjobinfo_t;
+typedef struct crocksdb_compactionreason_t crocksdb_compactionreason_t;
 typedef struct crocksdb_externalfileingestioninfo_t
     crocksdb_externalfileingestioninfo_t;
 typedef struct crocksdb_eventlistener_t crocksdb_eventlistener_t;
@@ -776,6 +777,9 @@ crocksdb_compactionjobinfo_total_input_bytes(
     const crocksdb_compactionjobinfo_t* info);
 extern C_ROCKSDB_LIBRARY_API uint64_t
 crocksdb_compactionjobinfo_total_output_bytes(
+    const crocksdb_compactionjobinfo_t* info);
+extern C_ROCKSDB_LIBRARY_API const crocksdb_compactionreason_t*
+crocksdb_compactionjobinfo_compaction_reason(
     const crocksdb_compactionjobinfo_t* info);
 
 /* External file ingestion info */

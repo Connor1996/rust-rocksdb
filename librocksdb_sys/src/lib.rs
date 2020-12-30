@@ -1957,7 +1957,7 @@ extern "C" {
     pub fn crocksdb_compactionjobinfo_total_output_bytes(info: *const DBCompactionJobInfo) -> u64;
     pub fn crocksdb_compactionjobinfo_compaction_reason(
         info: *const DBCompactionJobInfo,
-    ) -> CompactionReason;
+    ) -> *const CompactionReason;
 
     pub fn crocksdb_externalfileingestioninfo_cf_name(
         info: *const DBIngestionInfo,

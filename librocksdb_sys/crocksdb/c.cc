@@ -255,6 +255,9 @@ struct crocksdb_writestallinfo_t {
 struct crocksdb_compactionjobinfo_t {
   CompactionJobInfo rep;
 };
+struct crocksdb_compactionreason_t {
+  CompactionReason rep;
+};
 struct crocksdb_externalfileingestioninfo_t {
   ExternalFileIngestionInfo rep;
 };
@@ -2045,9 +2048,9 @@ uint64_t crocksdb_compactionjobinfo_total_output_bytes(
   return info->rep.stats.total_output_bytes;
 }
 
-CompactionReason crocksdb_compactionjobinfo_compaction_reason(
+const crocksdb_compactionreason_t* crocksdb_compactionjobinfo_compaction_reason(
     const crocksdb_compactionjobinfo_t* info) {
-  return info->rep.compaction_reason;
+  return reinterpret_cast<const crocksdb_compactionreason_t*>(&info->rep.compaction_reason);
 }
 
 /* ExternalFileIngestionInfo */
