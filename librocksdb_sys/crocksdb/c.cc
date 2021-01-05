@@ -2387,6 +2387,7 @@ void crocksdb_options_set_max_bytes_for_level_base(
 void crocksdb_options_set_level_compaction_dynamic_level_bytes(
     crocksdb_options_t* opt, unsigned char v) {
   opt->rep.level_compaction_dynamic_level_bytes = v;
+  opt->rep.enable_lazy_compaction = !v;
 }
 
 unsigned char crocksdb_options_get_level_compaction_dynamic_level_bytes(
