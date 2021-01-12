@@ -94,136 +94,136 @@ impl WriteBatch {
         }
     }
 
-    pub fn append(&mut self, src: &[u8]) {
-        unsafe {
-            crocksdb_ffi::crocksdb_writebatch_append_content(
-                self.inner,
-                src.as_ptr(),
-                src.len() as size_t,
-            );
-        }
-    }
+    // pub fn append(&mut self, src: &[u8]) {
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_writebatch_append_content(
+    //             self.inner,
+    //             src.as_ptr(),
+    //             src.len() as size_t,
+    //         );
+    //     }
+    // }
 
-    pub fn iterate<F>(&self, cfs: &[&str], mut iterator_fn: F)
-    where
-        F: FnMut(&str, DBValueType, &[u8], Option<&[u8]>),
-    {
-        unsafe {
-            let mut cb: &mut dyn FnMut(&str, DBValueType, &[u8], Option<&[u8]>) = &mut iterator_fn;
-            let cb_ptr = &mut cb;
-            let cb_proxy = Box::new(WriteBatchCallback {
-                cfs,
-                cb_ptr: cb_ptr as *mut _ as *mut c_void,
-            });
-            let state = Box::into_raw(cb_proxy) as *mut c_void;
-            crocksdb_ffi::crocksdb_writebatch_iterate_cf(
-                self.inner,
-                state,
-                put_fn,
-                put_cf_fn,
-                delete_fn,
-                delete_cf_fn,
-            );
-        }
-    }
+    // pub fn iterate<F>(&self, cfs: &[&str], mut iterator_fn: F)
+    // where
+    //     F: FnMut(&str, DBValueType, &[u8], Option<&[u8]>),
+    // {
+    //     unsafe {
+    //         let mut cb: &mut dyn FnMut(&str, DBValueType, &[u8], Option<&[u8]>) = &mut iterator_fn;
+    //         let cb_ptr = &mut cb;
+    //         let cb_proxy = Box::new(WriteBatchCallback {
+    //             cfs,
+    //             cb_ptr: cb_ptr as *mut _ as *mut c_void,
+    //         });
+    //         let state = Box::into_raw(cb_proxy) as *mut c_void;
+    //         crocksdb_ffi::crocksdb_writebatch_iterate_cf(
+    //             self.inner,
+    //             state,
+    //             put_fn,
+    //             put_cf_fn,
+    //             delete_fn,
+    //             delete_cf_fn,
+    //         );
+    //     }
+    // }
 
-    pub fn iter(&self) -> WriteBatchIter {
-        WriteBatchIter::new(self)
-    }
+    // pub fn iter(&self) -> WriteBatchIter {
+    //     WriteBatchIter::new(self)
+    // }
 }
 
-pub struct WriteBatchIter<'a> {
-    props: PhantomData<&'a DBWriteBatchIterator>,
-    inner: *mut DBWriteBatchIterator,
-}
+// pub struct WriteBatchIter<'a> {
+//     props: PhantomData<&'a DBWriteBatchIterator>,
+//     inner: *mut DBWriteBatchIterator,
+// }
 
-impl<'a> Drop for WriteBatchIter<'a> {
-    fn drop(&mut self) {
-        unsafe {
-            crocksdb_ffi::crocksdb_writebatch_iterator_destroy(self.inner);
-        }
-    }
-}
+// impl<'a> Drop for WriteBatchIter<'a> {
+//     fn drop(&mut self) {
+//         unsafe {
+//             crocksdb_ffi::crocksdb_writebatch_iterator_destroy(self.inner);
+//         }
+//     }
+// }
 
-impl<'a> WriteBatchIter<'a> {
-    fn new(wb: &'a WriteBatch) -> WriteBatchIter<'a> {
-        unsafe {
-            WriteBatchIter {
-                props: PhantomData,
-                inner: crocksdb_ffi::crocksdb_writebatch_iterator_create(wb.inner),
-            }
-        }
-    }
+// impl<'a> WriteBatchIter<'a> {
+//     fn new(wb: &'a WriteBatch) -> WriteBatchIter<'a> {
+//         unsafe {
+//             WriteBatchIter {
+//                 props: PhantomData,
+//                 inner: crocksdb_ffi::crocksdb_writebatch_iterator_create(wb.inner),
+//             }
+//         }
+//     }
 
-    fn from_bytes(data: &'a [u8]) -> WriteBatchIter<'a> {
-        unsafe {
-            WriteBatchIter {
-                props: PhantomData,
-                inner: crocksdb_ffi::crocksdb_writebatch_ref_iterator_create(
-                    data.as_ptr(),
-                    data.len() as size_t,
-                ),
-            }
-        }
-    }
-}
+//     fn from_bytes(data: &'a [u8]) -> WriteBatchIter<'a> {
+//         unsafe {
+//             WriteBatchIter {
+//                 props: PhantomData,
+//                 inner: crocksdb_ffi::crocksdb_writebatch_ref_iterator_create(
+//                     data.as_ptr(),
+//                     data.len() as size_t,
+//                 ),
+//             }
+//         }
+//     }
+// }
 
-impl<'a> Iterator for WriteBatchIter<'a> {
-    type Item = (DBValueType, u32, &'a [u8], &'a [u8]);
+// impl<'a> Iterator for WriteBatchIter<'a> {
+//     type Item = (DBValueType, u32, &'a [u8], &'a [u8]);
 
-    fn next(&mut self) -> Option<(DBValueType, u32, &'a [u8], &'a [u8])> {
-        unsafe {
-            if !crocksdb_ffi::crocksdb_writebatch_iterator_valid(self.inner) {
-                return None;
-            }
-            let mut klen: size_t = 0;
-            let k = crocksdb_ffi::crocksdb_writebatch_iterator_key(self.inner, &mut klen);
-            let key = slice::from_raw_parts(k, klen);
+//     fn next(&mut self) -> Option<(DBValueType, u32, &'a [u8], &'a [u8])> {
+//         unsafe {
+//             if !crocksdb_ffi::crocksdb_writebatch_iterator_valid(self.inner) {
+//                 return None;
+//             }
+//             let mut klen: size_t = 0;
+//             let k = crocksdb_ffi::crocksdb_writebatch_iterator_key(self.inner, &mut klen);
+//             let key = slice::from_raw_parts(k, klen);
 
-            let mut vlen: size_t = 0;
-            let v = crocksdb_ffi::crocksdb_writebatch_iterator_value(self.inner, &mut vlen);
-            let val = slice::from_raw_parts(v, vlen);
+//             let mut vlen: size_t = 0;
+//             let v = crocksdb_ffi::crocksdb_writebatch_iterator_value(self.inner, &mut vlen);
+//             let val = slice::from_raw_parts(v, vlen);
 
-            let value_type = match crocksdb_ffi::crocksdb_writebatch_iterator_value_type(self.inner)
-            {
-                DBValueType::TypeColumnFamilyDeletion => DBValueType::TypeDeletion,
-                DBValueType::TypeColumnFamilyValue => DBValueType::TypeValue,
-                DBValueType::TypeColumnFamilyMerge => DBValueType::TypeMerge,
-                DBValueType::TypeColumnFamilyRangeDeletion => DBValueType::TypeRangeDeletion,
-                other => other,
-            };
-            let column_family =
-                crocksdb_ffi::crocksdb_writebatch_iterator_column_family_id(self.inner);
+//             let value_type = match crocksdb_ffi::crocksdb_writebatch_iterator_value_type(self.inner)
+//             {
+//                 DBValueType::TypeColumnFamilyDeletion => DBValueType::TypeDeletion,
+//                 DBValueType::TypeColumnFamilyValue => DBValueType::TypeValue,
+//                 DBValueType::TypeColumnFamilyMerge => DBValueType::TypeMerge,
+//                 DBValueType::TypeColumnFamilyRangeDeletion => DBValueType::TypeRangeDeletion,
+//                 other => other,
+//             };
+//             let column_family =
+//                 crocksdb_ffi::crocksdb_writebatch_iterator_column_family_id(self.inner);
 
-            crocksdb_ffi::crocksdb_writebatch_iterator_next(self.inner);
+//             crocksdb_ffi::crocksdb_writebatch_iterator_next(self.inner);
 
-            Some((value_type, column_family, key, val))
-        }
-    }
-}
+//             Some((value_type, column_family, key, val))
+//         }
+//     }
+// }
 
-pub struct WriteBatchRef<'a> {
-    data: &'a [u8],
-}
+// pub struct WriteBatchRef<'a> {
+//     data: &'a [u8],
+// }
 
-impl<'a> WriteBatchRef<'a> {
-    pub fn new(data: &'a [u8]) -> WriteBatchRef<'a> {
-        WriteBatchRef { data }
-    }
+// impl<'a> WriteBatchRef<'a> {
+//     pub fn new(data: &'a [u8]) -> WriteBatchRef<'a> {
+//         WriteBatchRef { data }
+//     }
 
-    pub fn count(&self) -> usize {
-        unsafe {
-            crocksdb_ffi::crocksdb_writebatch_ref_count(
-                self.data.as_ptr(),
-                self.data.len() as size_t,
-            ) as usize
-        }
-    }
+//     pub fn count(&self) -> usize {
+//         unsafe {
+//             crocksdb_ffi::crocksdb_writebatch_ref_count(
+//                 self.data.as_ptr(),
+//                 self.data.len() as size_t,
+//             ) as usize
+//         }
+//     }
 
-    pub fn iter(&self) -> WriteBatchIter<'a> {
-        WriteBatchIter::from_bytes(self.data)
-    }
-}
+//     pub fn iter(&self) -> WriteBatchIter<'a> {
+//         WriteBatchIter::from_bytes(self.data)
+//     }
+// }
 
 pub unsafe extern "C" fn put_fn(
     state: *mut c_void,

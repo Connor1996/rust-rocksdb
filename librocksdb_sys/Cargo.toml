@@ -25,6 +25,7 @@ jemalloc = ["tikv-jemalloc-sys"]
 # when not using with static-link right now in this crate.
 portable = []
 sse = []
+static_libcpp = []
 
 [build-dependencies]
 cc = "1.0.3"

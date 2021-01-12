@@ -41,7 +41,7 @@ use std::{fs, ptr, slice};
 use cloud::CloudEnvOptions;
 #[cfg(feature = "encryption")]
 use encryption::{DBEncryptionKeyManager, EncryptionKeyManager};
-use file_system::{DBFileSystemInspector, FileSystemInspector};
+// use file_system::{DBFileSystemInspector, FileSystemInspector};
 use table_properties::{TableProperties, TablePropertiesCollection};
 use table_properties_rc::TablePropertiesCollection as RcTablePropertiesCollection;
 // use titan::TitanDBOptions;
@@ -289,16 +289,16 @@ impl<D> DBIterator<D> {
         }
     }
 
-    pub fn sequence(&self) -> Option<u64> {
-        debug_assert_eq!(self.valid(), Ok(true));
-        unsafe {
-            let mut seqno = 0;
-            if crocksdb_ffi::crocksdb_iter_seqno(self.inner, &mut seqno) {
-                return Some(seqno);
-            }
-            None
-        }
-    }
+    // pub fn sequence(&self) -> Option<u64> {
+    //     debug_assert_eq!(self.valid(), Ok(true));
+    //     unsafe {
+    //         let mut seqno = 0;
+    //         if crocksdb_ffi::crocksdb_iter_seqno(self.inner, &mut seqno) {
+    //             return Some(seqno);
+    //         }
+    //         None
+    //     }
+    // }
 
     #[deprecated]
     pub fn kv(&self) -> Option<(Vec<u8>, Vec<u8>)> {
@@ -2628,22 +2628,22 @@ impl Env {
         })
     }
 
-    pub fn new_file_system_inspected_env<T: FileSystemInspector>(
-        base_env: Arc<Env>,
-        file_system_inspector: T,
-    ) -> Result<Env, String> {
-        let db_file_system_inspector = DBFileSystemInspector::new(file_system_inspector);
-        let env = unsafe {
-            crocksdb_ffi::crocksdb_file_system_inspected_env_create(
-                base_env.inner,
-                db_file_system_inspector.inner,
-            )
-        };
-        Ok(Env {
-            inner: env,
-            base: Some(base_env),
-        })
-    }
+    // pub fn new_file_system_inspected_env<T: FileSystemInspector>(
+    //     base_env: Arc<Env>,
+    //     file_system_inspector: T,
+    // ) -> Result<Env, String> {
+    //     let db_file_system_inspector = DBFileSystemInspector::new(file_system_inspector);
+    //     let env = unsafe {
+    //         crocksdb_ffi::crocksdb_file_system_inspected_env_create(
+    //             base_env.inner,
+    //             db_file_system_inspector.inner,
+    //         )
+    //     };
+    //     Ok(Env {
+    //         inner: env,
+    //         base: Some(base_env),
+    //     })
+    // }
 
     pub fn new_sequential_file(
         &self,
@@ -2873,7 +2873,7 @@ mod test {
     use std::str;
     use std::string::String;
     use std::thread;
-    use write_batch::WriteBatchRef;
+    // use write_batch::WriteBatchRef;
 
     use super::*;
     use crate::tempdir_with_prefix;
@@ -3528,129 +3528,129 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_write_append() {
-        let mut opts = DBOptions::new();
-        opts.create_if_missing(true);
-        let path = tempdir_with_prefix("_rust_rocksdb_multi_batch");
+    // #[test]
+    // fn test_write_append() {
+    //     let mut opts = DBOptions::new();
+    //     opts.create_if_missing(true);
+    //     let path = tempdir_with_prefix("_rust_rocksdb_multi_batch");
 
-        let db = DB::open(opts, path.path().to_str().unwrap()).unwrap();
-        let cf = db.cf_handle("default").unwrap();
-        let mut wb = WriteBatch::new();
-        for s in &[b"ab", b"cd", b"ef"] {
-            let w = WriteBatch::new();
-            w.put_cf(cf, s.to_vec().as_slice(), b"a").unwrap();
-            wb.append(w.data());
-        }
-        db.write(&wb).unwrap();
-        for s in &[b"ab", b"cd", b"ef"] {
-            let v = db.get_cf(cf, s.to_vec().as_slice()).unwrap();
-            assert!(v.is_some());
-            assert_eq!(v.unwrap().to_utf8().unwrap(), "a");
-        }
-    }
+    //     let db = DB::open(opts, path.path().to_str().unwrap()).unwrap();
+    //     let cf = db.cf_handle("default").unwrap();
+    //     let mut wb = WriteBatch::new();
+    //     for s in &[b"ab", b"cd", b"ef"] {
+    //         let w = WriteBatch::new();
+    //         w.put_cf(cf, s.to_vec().as_slice(), b"a").unwrap();
+    //         wb.append(w.data());
+    //     }
+    //     db.write(&wb).unwrap();
+    //     for s in &[b"ab", b"cd", b"ef"] {
+    //         let v = db.get_cf(cf, s.to_vec().as_slice()).unwrap();
+    //         assert!(v.is_some());
+    //         assert_eq!(v.unwrap().to_utf8().unwrap(), "a");
+    //     }
+    // }
 
-    fn inner_test_write_batch_iter<F>(iter_fn: F)
-    where
-        F: FnOnce(&DB, &mut WriteBatch),
-    {
-        let temp_dir = tempdir_with_prefix("_rust_rocksdb_write_batch_iterate");
-        let path = temp_dir.path().to_str().unwrap();
-        let cfs = ["default", "cf1"];
-        let mut cfs_opts = vec![];
-        for _ in 0..cfs.len() {
-            cfs_opts.push(ColumnFamilyOptions::new());
-        }
-        let mut opts = DBOptions::new();
-        opts.create_if_missing(true);
-        let mut db = DB::open(opts, path).unwrap();
-        for (cf, cf_opts) in cfs.iter().zip(cfs_opts.iter().cloned()) {
-            if *cf != "default" {
-                db.create_cf((*cf, cf_opts)).unwrap();
-            }
-        }
+    // fn inner_test_write_batch_iter<F>(iter_fn: F)
+    // where
+    //     F: FnOnce(&DB, &mut WriteBatch),
+    // {
+    //     let temp_dir = tempdir_with_prefix("_rust_rocksdb_write_batch_iterate");
+    //     let path = temp_dir.path().to_str().unwrap();
+    //     let cfs = ["default", "cf1"];
+    //     let mut cfs_opts = vec![];
+    //     for _ in 0..cfs.len() {
+    //         cfs_opts.push(ColumnFamilyOptions::new());
+    //     }
+    //     let mut opts = DBOptions::new();
+    //     opts.create_if_missing(true);
+    //     let mut db = DB::open(opts, path).unwrap();
+    //     for (cf, cf_opts) in cfs.iter().zip(cfs_opts.iter().cloned()) {
+    //         if *cf != "default" {
+    //             db.create_cf((*cf, cf_opts)).unwrap();
+    //         }
+    //     }
 
-        let mut wb = WriteBatch::new();
-        let default_cf = db.cf_handle("default").unwrap();
-        let cf1 = db.cf_handle("cf1").unwrap();
-        db.put_cf(default_cf, b"k1", b"v0").unwrap();
-        db.put_cf(cf1, b"k1", b"v0").unwrap();
+    //     let mut wb = WriteBatch::new();
+    //     let default_cf = db.cf_handle("default").unwrap();
+    //     let cf1 = db.cf_handle("cf1").unwrap();
+    //     db.put_cf(default_cf, b"k1", b"v0").unwrap();
+    //     db.put_cf(cf1, b"k1", b"v0").unwrap();
 
-        wb.put_cf(default_cf, b"k2", b"v1").unwrap();
-        wb.put_cf(cf1, b"k2", b"v1").unwrap();
-        wb.delete_cf(default_cf, b"k1").unwrap();
-        wb.delete_cf(cf1, b"k1").unwrap();
-        iter_fn(&db, &mut wb);
+    //     wb.put_cf(default_cf, b"k2", b"v1").unwrap();
+    //     wb.put_cf(cf1, b"k2", b"v1").unwrap();
+    //     wb.delete_cf(default_cf, b"k1").unwrap();
+    //     wb.delete_cf(cf1, b"k1").unwrap();
+    //     iter_fn(&db, &mut wb);
 
-        for cf in &["default", "cf1"] {
-            let handle = db.cf_handle(cf).unwrap();
-            let v0 = db.get_cf(handle, b"k1").unwrap();
-            assert!(v0.is_none());
+    //     for cf in &["default", "cf1"] {
+    //         let handle = db.cf_handle(cf).unwrap();
+    //         let v0 = db.get_cf(handle, b"k1").unwrap();
+    //         assert!(v0.is_none());
 
-            let v1 = db.get_cf(handle, b"k2").unwrap();
-            assert!(v1.is_some());
-            assert_eq!(v1.unwrap().to_utf8().unwrap(), "v1");
-        }
-    }
+    //         let v1 = db.get_cf(handle, b"k2").unwrap();
+    //         assert!(v1.is_some());
+    //         assert_eq!(v1.unwrap().to_utf8().unwrap(), "v1");
+    //     }
+    // }
 
-    #[test]
-    fn test_write_batch_iterate() {
-        inner_test_write_batch_iter(|db, wb| {
-            let cf_names = db.cf_names();
-            wb.iterate(&cf_names, |cf, write_type, key, value| {
-                let handle = db.cf_handle(cf).unwrap();
-                match write_type {
-                    DBValueType::TypeValue => {
-                        db.put_cf(handle, key, value.unwrap()).unwrap();
-                    }
-                    DBValueType::TypeDeletion => {
-                        db.delete_cf(handle, key).unwrap();
-                    }
-                    _ => (),
-                }
-            });
-        });
-    }
+    // #[test]
+    // fn test_write_batch_iterate() {
+    //     inner_test_write_batch_iter(|db, wb| {
+    //         let cf_names = db.cf_names();
+    //         wb.iterate(&cf_names, |cf, write_type, key, value| {
+    //             let handle = db.cf_handle(cf).unwrap();
+    //             match write_type {
+    //                 DBValueType::TypeValue => {
+    //                     db.put_cf(handle, key, value.unwrap()).unwrap();
+    //                 }
+    //                 DBValueType::TypeDeletion => {
+    //                     db.delete_cf(handle, key).unwrap();
+    //                 }
+    //                 _ => (),
+    //             }
+    //         });
+    //     });
+    // }
 
-    #[test]
-    fn test_write_batch_ref_iter() {
-        inner_test_write_batch_iter(|db, wb| {
-            let wb_ref = WriteBatchRef::new(wb.data());
-            assert_eq!(wb.count(), wb_ref.count());
-            for (value_type, c, key, value) in wb_ref.iter() {
-                let handle = db.cf_handle_by_id(c as usize).unwrap();
-                match value_type {
-                    DBValueType::TypeValue => {
-                        db.put_cf(handle, key, value).unwrap();
-                    }
-                    DBValueType::TypeDeletion => {
-                        db.delete_cf(handle, key).unwrap();
-                    }
-                    _ => {
-                        println!("error type, cf: {}", c);
-                    }
-                }
-            }
-        });
-    }
+    // #[test]
+    // fn test_write_batch_ref_iter() {
+    //     inner_test_write_batch_iter(|db, wb| {
+    //         let wb_ref = WriteBatchRef::new(wb.data());
+    //         assert_eq!(wb.count(), wb_ref.count());
+    //         for (value_type, c, key, value) in wb_ref.iter() {
+    //             let handle = db.cf_handle_by_id(c as usize).unwrap();
+    //             match value_type {
+    //                 DBValueType::TypeValue => {
+    //                     db.put_cf(handle, key, value).unwrap();
+    //                 }
+    //                 DBValueType::TypeDeletion => {
+    //                     db.delete_cf(handle, key).unwrap();
+    //                 }
+    //                 _ => {
+    //                     println!("error type, cf: {}", c);
+    //                 }
+    //             }
+    //         }
+    //     });
+    // }
 
-    #[test]
-    fn test_write_batch_iter() {
-        inner_test_write_batch_iter(|db, wb| {
-            for (value_type, c, key, value) in wb.iter() {
-                let handle = db.cf_handle_by_id(c as usize).unwrap();
-                match value_type {
-                    DBValueType::TypeValue => {
-                        db.put_cf(handle, key, value).unwrap();
-                    }
-                    DBValueType::TypeDeletion => {
-                        db.delete_cf(handle, key).unwrap();
-                    }
-                    _ => {
-                        println!("error type, cf: {}", c);
-                    }
-                }
-            }
-        });
-    }
+    // #[test]
+    // fn test_write_batch_iter() {
+    //     inner_test_write_batch_iter(|db, wb| {
+    //         for (value_type, c, key, value) in wb.iter() {
+    //             let handle = db.cf_handle_by_id(c as usize).unwrap();
+    //             match value_type {
+    //                 DBValueType::TypeValue => {
+    //                     db.put_cf(handle, key, value).unwrap();
+    //                 }
+    //                 DBValueType::TypeDeletion => {
+    //                     db.delete_cf(handle, key).unwrap();
+    //                 }
+    //                 _ => {
+    //                     println!("error type, cf: {}", c);
+    //                 }
+    //             }
+    //         }
+    //     });
+    // }
 }

@@ -38,10 +38,10 @@ pub use compaction_filter::{
 #[cfg(feature = "encryption")]
 pub use encryption::{DBEncryptionMethod, EncryptionKeyManager, FileEncryptionInfo};
 pub use event_listener::{
-    CompactionJobInfo, EventListener, FlushJobInfo, IngestionInfo, SubcompactionJobInfo,
+    CompactionJobInfo, EventListener, FlushJobInfo, IngestionInfo,
     WriteStallInfo,
 };
-pub use file_system::FileSystemInspector;
+// pub use file_system::FileSystemInspector;
 pub use librocksdb_sys::{
     self as crocksdb_ffi, new_bloom_filter, CompactionPriority, CompactionReason,
     DBBackgroundErrorReason, DBBottommostLevelCompaction, DBCompactionStyle, DBCompressionType,
@@ -66,9 +66,9 @@ pub use rocksdb_options::{
     WriteOptions,
 };
 pub use slice_transform::SliceTransform;
-pub use sst_partitioner::{
-    SstPartitioner, SstPartitionerContext, SstPartitionerFactory, SstPartitionerRequest,
-};
+// pub use sst_partitioner::{
+//     SstPartitioner, SstPartitionerContext, SstPartitionerFactory, SstPartitionerRequest,
+// };
 pub use table_filter::TableFilter;
 pub use table_properties::{
     TableProperties, TablePropertiesCollection, TablePropertiesCollectionView,
@@ -77,7 +77,7 @@ pub use table_properties::{
 pub use table_properties_collector::TablePropertiesCollector;
 pub use table_properties_collector_factory::TablePropertiesCollectorFactory;
 // pub use titan::{TitanBlobIndex, TitanDBOptions};
-pub use write_batch::{WriteBatch, WriteBatchIter, WriteBatchRef};
+pub use write_batch::{WriteBatch};
 
 #[allow(deprecated)]
 pub use rocksdb::Kv;

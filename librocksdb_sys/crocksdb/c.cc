@@ -2140,12 +2140,12 @@ const char* crocksdb_compactionjobinfo_output_file_at(
   return path.data();
 }
 
-// const crocksdb_table_properties_collection_t*
-// crocksdb_compactionjobinfo_table_properties(
-//     const crocksdb_compactionjobinfo_t* info) {
-//   return reinterpret_cast<const crocksdb_table_properties_collection_t*>(
-//       &info->rep.table_properties);
-// }
+const crocksdb_table_properties_collection_t*
+crocksdb_compactionjobinfo_table_properties(
+    const crocksdb_compactionjobinfo_t* info) {
+  return reinterpret_cast<const crocksdb_table_properties_collection_t*>(
+      &info->rep.table_properties);
+}
 
 uint64_t crocksdb_compactionjobinfo_elapsed_micros(
     const crocksdb_compactionjobinfo_t* info) {

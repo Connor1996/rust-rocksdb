@@ -33,7 +33,7 @@ use merge_operator::{self, full_merge_callback, partial_merge_callback, MergeOpe
 use rocksdb::Env;
 use rocksdb::{Cache, MemoryAllocator};
 use slice_transform::{new_slice_transform, SliceTransform};
-use sst_partitioner::{new_sst_partitioner_factory, SstPartitionerFactory};
+// use sst_partitioner::{new_sst_partitioner_factory, SstPartitionerFactory};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr;
@@ -227,24 +227,24 @@ impl RateLimiter {
         RateLimiter { inner: limiter }
     }
 
-    pub fn new_writeampbased_with_auto_tuned(
-        rate_bytes_per_sec: i64,
-        refill_period_us: i64,
-        fairness: i32,
-        mode: DBRateLimiterMode,
-        auto_tuned: bool,
-    ) -> RateLimiter {
-        let limiter = unsafe {
-            crocksdb_ffi::crocksdb_writeampbasedratelimiter_create_with_auto_tuned(
-                rate_bytes_per_sec,
-                refill_period_us,
-                fairness,
-                mode,
-                auto_tuned,
-            )
-        };
-        RateLimiter { inner: limiter }
-    }
+    // pub fn new_writeampbased_with_auto_tuned(
+    //     rate_bytes_per_sec: i64,
+    //     refill_period_us: i64,
+    //     fairness: i32,
+    //     mode: DBRateLimiterMode,
+    //     auto_tuned: bool,
+    // ) -> RateLimiter {
+    //     let limiter = unsafe {
+    //         crocksdb_ffi::crocksdb_writeampbasedratelimiter_create_with_auto_tuned(
+    //             rate_bytes_per_sec,
+    //             refill_period_us,
+    //             fairness,
+    //             mode,
+    //             auto_tuned,
+    //         )
+    //     };
+    //     RateLimiter { inner: limiter }
+    // }
 
     pub fn set_bytes_per_second(&self, bytes_per_sec: i64) {
         unsafe {
@@ -1055,24 +1055,24 @@ impl DBOptions {
         }
     }
 
-    pub fn set_writeampbasedratelimiter_with_auto_tuned(
-        &mut self,
-        rate_bytes_per_sec: i64,
-        refill_period_us: i64,
-        mode: DBRateLimiterMode,
-        auto_tuned: bool,
-    ) {
-        let rate_limiter = RateLimiter::new_writeampbased_with_auto_tuned(
-            rate_bytes_per_sec,
-            refill_period_us,
-            DEFAULT_FAIRNESS,
-            mode,
-            auto_tuned,
-        );
-        unsafe {
-            crocksdb_ffi::crocksdb_options_set_ratelimiter(self.inner, rate_limiter.inner);
-        }
-    }
+    // pub fn set_writeampbasedratelimiter_with_auto_tuned(
+    //     &mut self,
+    //     rate_bytes_per_sec: i64,
+    //     refill_period_us: i64,
+    //     mode: DBRateLimiterMode,
+    //     auto_tuned: bool,
+    // ) {
+    //     let rate_limiter = RateLimiter::new_writeampbased_with_auto_tuned(
+    //         rate_bytes_per_sec,
+    //         refill_period_us,
+    //         DEFAULT_FAIRNESS,
+    //         mode,
+    //         auto_tuned,
+    //     );
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_options_set_ratelimiter(self.inner, rate_limiter.inner);
+    //     }
+    // }
 
     pub fn set_rate_bytes_per_sec(&mut self, rate_bytes_per_sec: i64) -> Result<(), String> {
         let limiter = unsafe { crocksdb_ffi::crocksdb_options_get_ratelimiter(self.inner) };
@@ -1103,30 +1103,30 @@ impl DBOptions {
         Some(rate)
     }
 
-    pub fn set_auto_tuned(&mut self, auto_tuned: bool) -> Result<(), String> {
-        let limiter = unsafe { crocksdb_ffi::crocksdb_options_get_ratelimiter(self.inner) };
-        if limiter.is_null() {
-            return Err("Failed to get rate limiter".to_owned());
-        }
+    // pub fn set_auto_tuned(&mut self, auto_tuned: bool) -> Result<(), String> {
+    //     let limiter = unsafe { crocksdb_ffi::crocksdb_options_get_ratelimiter(self.inner) };
+    //     if limiter.is_null() {
+    //         return Err("Failed to get rate limiter".to_owned());
+    //     }
 
-        let rate_limiter = RateLimiter { inner: limiter };
+    //     let rate_limiter = RateLimiter { inner: limiter };
 
-        unsafe {
-            crocksdb_ffi::crocksdb_ratelimiter_set_auto_tuned(rate_limiter.inner, auto_tuned);
-        }
-        Ok(())
-    }
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_ratelimiter_set_auto_tuned(rate_limiter.inner, auto_tuned);
+    //     }
+    //     Ok(())
+    // }
 
-    pub fn get_auto_tuned(&self) -> Option<bool> {
-        let limiter = unsafe { crocksdb_ffi::crocksdb_options_get_ratelimiter(self.inner) };
-        if limiter.is_null() {
-            return None;
-        }
+    // pub fn get_auto_tuned(&self) -> Option<bool> {
+    //     let limiter = unsafe { crocksdb_ffi::crocksdb_options_get_ratelimiter(self.inner) };
+    //     if limiter.is_null() {
+    //         return None;
+    //     }
 
-        let rate_limiter = RateLimiter { inner: limiter };
-        let mode = unsafe { crocksdb_ffi::crocksdb_ratelimiter_get_auto_tuned(rate_limiter.inner) };
-        Some(mode)
-    }
+    //     let rate_limiter = RateLimiter { inner: limiter };
+    //     let mode = unsafe { crocksdb_ffi::crocksdb_ratelimiter_get_auto_tuned(rate_limiter.inner) };
+    //     Some(mode)
+    // }
 
     // Create a info log with `path` and save to options logger field directly.
     // TODO: export more logger options like level, roll size, time, etc...
@@ -1855,12 +1855,12 @@ impl ColumnFamilyOptions {
         }
     }
 
-    pub fn set_sst_partitioner_factory<F: SstPartitionerFactory>(&mut self, factory: F) {
-        let f = new_sst_partitioner_factory(factory);
-        unsafe {
-            crocksdb_ffi::crocksdb_options_set_sst_partitioner_factory(self.inner, f);
-        }
-    }
+    // pub fn set_sst_partitioner_factory<F: SstPartitionerFactory>(&mut self, factory: F) {
+    //     let f = new_sst_partitioner_factory(factory);
+    //     unsafe {
+    //         crocksdb_ffi::crocksdb_options_set_sst_partitioner_factory(self.inner, f);
+    //     }
+    // }
 
     pub fn set_compact_on_deletion(&self, sliding_window_size: usize, deletion_trigger: usize) {
         unsafe {

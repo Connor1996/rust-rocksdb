@@ -43,12 +43,12 @@ impl FlushJobInfo {
         Path::new(p)
     }
 
-    pub fn table_properties(&self) -> &TableProperties {
-        unsafe {
-            let prop = crocksdb_ffi::crocksdb_flushjobinfo_table_properties(&self.0);
-            TableProperties::from_ptr(prop)
-        }
-    }
+    // pub fn table_properties(&self) -> &TableProperties {
+    //     unsafe {
+    //         let prop = crocksdb_ffi::crocksdb_flushjobinfo_table_properties(&self.0);
+    //         TableProperties::from_ptr(prop)
+    //     }
+    // }
 
     pub fn triggered_writes_slowdown(&self) -> bool {
         unsafe { crocksdb_ffi::crocksdb_flushjobinfo_triggered_writes_slowdown(&self.0) }
@@ -130,31 +130,31 @@ impl CompactionJobInfo {
     }
 }
 
-#[repr(transparent)]
-pub struct SubcompactionJobInfo(DBSubcompactionJobInfo);
+// #[repr(transparent)]
+// pub struct SubcompactionJobInfo(DBSubcompactionJobInfo);
 
-impl SubcompactionJobInfo {
-    pub fn status(&self) -> Result<(), String> {
-        unsafe { ffi_try!(crocksdb_subcompactionjobinfo_status(&self.0)) }
-        Ok(())
-    }
+// impl SubcompactionJobInfo {
+//     pub fn status(&self) -> Result<(), String> {
+//         unsafe { ffi_try!(crocksdb_subcompactionjobinfo_status(&self.0)) }
+//         Ok(())
+//     }
 
-    pub fn cf_name(&self) -> &str {
-        unsafe { fetch_str!(crocksdb_subcompactionjobinfo_cf_name(&self.0)) }
-    }
+//     pub fn cf_name(&self) -> &str {
+//         unsafe { fetch_str!(crocksdb_subcompactionjobinfo_cf_name(&self.0)) }
+//     }
 
-    pub fn thread_id(&self) -> u64 {
-        unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_thread_id(&self.0) }
-    }
+//     pub fn thread_id(&self) -> u64 {
+//         unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_thread_id(&self.0) }
+//     }
 
-    pub fn base_input_level(&self) -> i32 {
-        unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_base_input_level(&self.0) }
-    }
+//     pub fn base_input_level(&self) -> i32 {
+//         unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_base_input_level(&self.0) }
+//     }
 
-    pub fn output_level(&self) -> i32 {
-        unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_output_level(&self.0) }
-    }
-}
+//     pub fn output_level(&self) -> i32 {
+//         unsafe { crocksdb_ffi::crocksdb_subcompactionjobinfo_output_level(&self.0) }
+//     }
+// }
 
 #[repr(transparent)]
 pub struct IngestionInfo(DBIngestionInfo);
@@ -173,12 +173,12 @@ impl IngestionInfo {
         Path::new(p)
     }
 
-    pub fn table_properties(&self) -> &TableProperties {
-        unsafe {
-            let prop = crocksdb_ffi::crocksdb_externalfileingestioninfo_table_properties(&self.0);
-            TableProperties::from_ptr(prop)
-        }
-    }
+    // pub fn table_properties(&self) -> &TableProperties {
+    //     unsafe {
+    //         let prop = crocksdb_ffi::crocksdb_externalfileingestioninfo_table_properties(&self.0);
+    //         TableProperties::from_ptr(prop)
+    //     }
+    // }
 }
 
 #[repr(transparent)]
@@ -210,8 +210,8 @@ pub trait EventListener: Send + Sync {
     fn on_flush_completed(&self, _: &FlushJobInfo) {}
     fn on_compaction_begin(&self, _: &CompactionJobInfo) {}
     fn on_compaction_completed(&self, _: &CompactionJobInfo) {}
-    fn on_subcompaction_begin(&self, _: &SubcompactionJobInfo) {}
-    fn on_subcompaction_completed(&self, _: &SubcompactionJobInfo) {}
+    // fn on_subcompaction_begin(&self, _: &SubcompactionJobInfo) {}
+    // fn on_subcompaction_completed(&self, _: &SubcompactionJobInfo) {}
     fn on_external_file_ingested(&self, _: &IngestionInfo) {}
     fn on_background_error(&self, _: DBBackgroundErrorReason, _: Result<(), String>) {}
     fn on_stall_conditions_changed(&self, _: &WriteStallInfo) {}
@@ -277,25 +277,25 @@ extern "C" fn on_compaction_completed(
     ctx.on_compaction_completed(info);
 }
 
-extern "C" fn on_subcompaction_begin(ctx: *mut c_void, info: *const DBSubcompactionJobInfo) {
-    let (ctx, info) = unsafe {
-        (
-            &*(ctx as *mut Box<dyn EventListener>),
-            &*(info as *const SubcompactionJobInfo),
-        )
-    };
-    ctx.on_subcompaction_begin(info);
-}
+// extern "C" fn on_subcompaction_begin(ctx: *mut c_void, info: *const DBSubcompactionJobInfo) {
+//     let (ctx, info) = unsafe {
+//         (
+//             &*(ctx as *mut Box<dyn EventListener>),
+//             &*(info as *const SubcompactionJobInfo),
+//         )
+//     };
+//     ctx.on_subcompaction_begin(info);
+// }
 
-extern "C" fn on_subcompaction_completed(ctx: *mut c_void, info: *const DBSubcompactionJobInfo) {
-    let (ctx, info) = unsafe {
-        (
-            &*(ctx as *mut Box<dyn EventListener>),
-            &*(info as *const SubcompactionJobInfo),
-        )
-    };
-    ctx.on_subcompaction_completed(info);
-}
+// extern "C" fn on_subcompaction_completed(ctx: *mut c_void, info: *const DBSubcompactionJobInfo) {
+//     let (ctx, info) = unsafe {
+//         (
+//             &*(ctx as *mut Box<dyn EventListener>),
+//             &*(info as *const SubcompactionJobInfo),
+//         )
+//     };
+//     ctx.on_subcompaction_completed(info);
+// }
 
 extern "C" fn on_external_file_ingested(
     ctx: *mut c_void,
@@ -348,8 +348,8 @@ pub fn new_event_listener<L: EventListener>(l: L) -> *mut DBEventListener {
             on_flush_completed,
             on_compaction_begin,
             on_compaction_completed,
-            on_subcompaction_begin,
-            on_subcompaction_completed,
+            // on_subcompaction_begin,
+            // on_subcompaction_completed,
             on_external_file_ingested,
             on_background_error,
             on_stall_conditions_changed,
