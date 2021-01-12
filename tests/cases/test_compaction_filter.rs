@@ -46,51 +46,51 @@ impl Drop for Filter {
     }
 }
 
-#[test]
-fn test_compaction_filter() {
-    let path = tempdir_with_prefix("_rust_rocksdb_writebacktest");
-    let drop_called = Arc::new(AtomicBool::new(false));
-    let filtered_kvs = Arc::new(RwLock::new(vec![]));
+// #[test]
+// fn test_compaction_filter() {
+//     let path = tempdir_with_prefix("_rust_rocksdb_writebacktest");
+//     let drop_called = Arc::new(AtomicBool::new(false));
+//     let filtered_kvs = Arc::new(RwLock::new(vec![]));
 
-    // reregister with ignore_snapshots set to true
-    let mut cf_opts = ColumnFamilyOptions::new();
-    cf_opts
-        .set_compaction_filter(
-            "test",
-            Box::new(Filter {
-                drop_called: drop_called.clone(),
-                filtered_kvs: filtered_kvs.clone(),
-            }),
-        )
-        .unwrap();
+//     // reregister with ignore_snapshots set to true
+//     let mut cf_opts = ColumnFamilyOptions::new();
+//     cf_opts
+//         .set_compaction_filter(
+//             "test",
+//             Box::new(Filter {
+//                 drop_called: drop_called.clone(),
+//                 filtered_kvs: filtered_kvs.clone(),
+//             }),
+//         )
+//         .unwrap();
 
-    let mut opts = DBOptions::new();
-    opts.create_if_missing(true);
-    {
-        let db = DB::open_cf(
-            opts,
-            path.path().to_str().unwrap(),
-            vec![("default", cf_opts)],
-        )
-        .unwrap();
+//     let mut opts = DBOptions::new();
+//     opts.create_if_missing(true);
+//     {
+//         let db = DB::open_cf(
+//             opts,
+//             path.path().to_str().unwrap(),
+//             vec![("default", cf_opts)],
+//         )
+//         .unwrap();
 
-        let samples = vec![
-            (b"key1".to_vec(), b"value1".to_vec()),
-            (b"key2".to_vec(), b"value2".to_vec()),
-        ];
+//         let samples = vec![
+//             (b"key1".to_vec(), b"value1".to_vec()),
+//             (b"key2".to_vec(), b"value2".to_vec()),
+//         ];
 
-        for &(ref k, ref v) in &samples {
-            db.put(k, v).unwrap();
-            assert_eq!(v.as_slice(), &*db.get(k).unwrap().unwrap());
-        }
+//         for &(ref k, ref v) in &samples {
+//             db.put(k, v).unwrap();
+//             assert_eq!(v.as_slice(), &*db.get(k).unwrap().unwrap());
+//         }
 
-        let _snap = db.snapshot();
-        // Because ignore_snapshots is true, so all the keys will be compacted.
-        db.compact_range(Some(b"key1"), Some(b"key3"));
-        for &(ref k, _) in &samples {
-            assert!(db.get(k).unwrap().is_none());
-        }
-        assert_eq!(*filtered_kvs.read().unwrap(), samples);
-    }
-    assert!(drop_called.load(Ordering::Relaxed));
-}
+//         let _snap = db.snapshot();
+//         // Because ignore_snapshots is true, so all the keys will be compacted.
+//         db.compact_range(Some(b"key1"), Some(b"key3"));
+//         for &(ref k, _) in &samples {
+//             assert!(db.get(k).unwrap().is_none());
+//         }
+//         assert_eq!(*filtered_kvs.read().unwrap(), samples);
+//     }
+//     assert!(drop_called.load(Ordering::Relaxed));
+// }

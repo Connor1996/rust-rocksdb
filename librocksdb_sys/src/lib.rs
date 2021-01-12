@@ -319,6 +319,14 @@ pub enum CompactionReason {
     Flush,
     // Compaction caused by external sst file ingestion
     ExternalSstIngestion,
+    // Reduce size or read amplification in composite sst
+    CompositeAmplification,
+    // Trivial move level
+    TrivialMoveLevel,
+    // kv separate GC.
+    GarbageCollection,
+    // Found RangeDeletion
+    RangeDeletion,
     // total number of compaction reasons, new reasons must be added above this.
     NumOfReasons,
 }
@@ -2144,7 +2152,7 @@ extern "C" {
     pub fn crocksdb_compactionjobinfo_total_output_bytes(info: *const DBCompactionJobInfo) -> u64;
     pub fn crocksdb_compactionjobinfo_compaction_reason(
         info: *const DBCompactionJobInfo,
-    ) -> CompactionReason;
+    ) -> *const CompactionReason;
 
     pub fn crocksdb_subcompactionjobinfo_status(
         info: *const DBSubcompactionJobInfo,
@@ -2220,13 +2228,13 @@ extern "C" {
 
     pub fn crocksdb_keyversions_type(kvs: *mut DBKeyVersions, index: usize) -> c_int;
 
-    pub fn crocksdb_set_external_sst_file_global_seq_no(
-        db: *mut DBInstance,
-        handle: *mut DBCFHandle,
-        file: *const c_char,
-        seq_no: u64,
-        err: *mut *mut c_char,
-    ) -> u64;
+    // pub fn crocksdb_set_external_sst_file_global_seq_no(
+    //     db: *mut DBInstance,
+    //     handle: *mut DBCFHandle,
+    //     file: *const c_char,
+    //     seq_no: u64,
+    //     err: *mut *mut c_char,
+    // ) -> u64;
 
     pub fn crocksdb_get_column_family_meta_data(
         db: *mut DBInstance,
@@ -2368,12 +2376,8 @@ extern "C" {
     pub fn crocksdb_perf_context_env_lock_file_nanos(ctx: *mut DBPerfContext) -> u64;
     pub fn crocksdb_perf_context_env_unlock_file_nanos(ctx: *mut DBPerfContext) -> u64;
     pub fn crocksdb_perf_context_env_new_logger_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_get_cpu_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_iter_next_cpu_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_iter_prev_cpu_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_iter_seek_cpu_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_encrypt_data_nanos(ctx: *mut DBPerfContext) -> u64;
-    pub fn crocksdb_perf_context_decrypt_data_nanos(ctx: *mut DBPerfContext) -> u64;
+    // pub fn crocksdb_perf_context_encrypt_data_nanos(ctx: *mut DBPerfContext) -> u64;
+    // pub fn crocksdb_perf_context_decrypt_data_nanos(ctx: *mut DBPerfContext) -> u64;
 
     pub fn crocksdb_get_iostats_context() -> *mut DBIOStatsContext;
     pub fn crocksdb_iostats_context_reset(ctx: *mut DBIOStatsContext);
